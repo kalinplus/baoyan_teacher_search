@@ -1,0 +1,7 @@
+{
+  "北京大学": ["北大", "PKU", "Peking University"],
+  "清华大学": ["清华", "THU", "Tsinghua University"],
+  "中国科学院大学": ["国科大", "UCAS", "University of Chinese Academy of Sciences"],
+  "浙江大学": ["浙大", "ZJU", "Zhejiang University"],
+  "上海交通大学": ["上交", "SJTU", "Shanghai Jiao Tong University"]
+}

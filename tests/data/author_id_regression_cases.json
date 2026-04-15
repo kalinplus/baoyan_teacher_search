@@ -1,0 +1,44 @@
+[
+  {
+    "school": "清华",
+    "canonical_school": "清华大学",
+    "teacher": "许华哲",
+    "expected_author_id": "t9HPFawAAAAJ"
+  },
+  {
+    "school": "清华",
+    "canonical_school": "清华大学",
+    "teacher": "高阳",
+    "expected_author_id": "bo0P2qYAAAAJ"
+  },
+  {
+    "school": "清华",
+    "canonical_school": "清华大学",
+    "teacher": "赵行",
+    "expected_author_id": "DmahiOYAAAAJ"
+  },
+  {
+    "school": "北大",
+    "canonical_school": "北京大学",
+    "teacher": "李戈",
+    "expected_author_id": "PPqcVRwAAAAJ"
+  },
+  {
+    "school": "上交",
+    "canonical_school": "上海交通大学",
+    "teacher": "林洲汉",
+    "expected_author_id": "LNZ4efwAAAAJ"
+  },
+  {
+    "school": "浙大",
+    "canonical_school": "浙江大学",
+    "teacher": "赵洲",
+    "expected_author_id": "IIoFY90AAAAJ"
+  },
+  {
+    "school": "浙大",
+    "canonical_school": "浙江大学",
+    "teacher": "禇志轩",
+    "expected_author_id": "a4IuTngAAAAJ"
+  }
+]
