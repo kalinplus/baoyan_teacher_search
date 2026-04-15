@@ -81,6 +81,7 @@ conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周�
 - `publications_last_1y`
 - `publications_last_3y`
 - `publications_last_5y`
+- `publications_truncated`
 - `h_index_all`
 - `i10_index_all`
 - `source`
@@ -89,7 +90,7 @@ conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周�
 
 附加字段：
 
-- 无
+- `publications_truncated=true` 表示当前发文统计可能被单次抓取窗口截断（存在下一页）；`false` 表示当前请求未检测到下一页
 
 ## 自动化验收命令
 

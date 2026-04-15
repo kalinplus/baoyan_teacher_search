@@ -25,7 +25,7 @@ SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 class ScholarAuthorClient:
     """Fetch and normalize author profile data from SerpApi by author_id."""
 
-    def __init__(self, serpapi_key: str, timeout: int = 30, endpoint: str = SERPAPI_ENDPOINT):
+    def __init__(self, serpapi_key: str, timeout: int = 60, endpoint: str = SERPAPI_ENDPOINT):
         if not serpapi_key:
             raise RuntimeError("Missing environment variable: SERPAPI_KEY")
         self.serpapi_key = serpapi_key
@@ -57,6 +57,8 @@ class ScholarAuthorClient:
         table = cited_by.get("table", []) or []
         graph = cited_by.get("graph", []) or []
         articles = payload.get("articles", []) or []
+        pagination = payload.get("serpapi_pagination", {}) or {}
+        publications_truncated = bool(pagination.get("next"))
 
         interests = []
         for item in author.get("interests", []) or []:
@@ -76,6 +78,7 @@ class ScholarAuthorClient:
             "publications_last_1y": self._publication_count(articles, recent_years=1),
             "publications_last_3y": self._publication_count(articles, recent_years=3),
             "publications_last_5y": self._publication_count(articles, recent_years=5),
+            "publications_truncated": publications_truncated,
             "h_index_all": self._get_table_metric(table, "h_index", "all"),
             "i10_index_all": self._get_table_metric(table, "i10_index", "all"),
         }
@@ -134,8 +137,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=30,
-        help="HTTP timeout in seconds (default: 30)",
+        default=60,
+        help="HTTP timeout in seconds (default: 60)",
     )
     return parser.parse_args()
 
@@ -182,6 +185,7 @@ def build_summary(result: Dict[str, Any]) -> str:
         f"- 近1年发文: {result['publications_last_1y']}",
         f"- 近3年发文: {result['publications_last_3y']}",
         f"- 近5年发文: {result['publications_last_5y']}",
+        f"- 发文统计是否截断: {'是' if result['publications_truncated'] else '否'}",
         f"- h-index: {result['h_index_all']}",
         f"- i10-index: {result['i10_index_all']}",
         "",
@@ -237,6 +241,7 @@ def main() -> int:
         "publications_last_1y": profile["publications_last_1y"],
         "publications_last_3y": profile["publications_last_3y"],
         "publications_last_5y": profile["publications_last_5y"],
+        "publications_truncated": profile["publications_truncated"],
         "h_index_all": profile["h_index_all"],
         "i10_index_all": profile["i10_index_all"],
         "source": f"{author_id_source},scholar_author",

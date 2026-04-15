@@ -51,7 +51,7 @@ def get_author_id(name: str, school_en: str) -> str | None:
         "render": "false",  # Google Search 无需 JS 渲染
         "country_code": "us",
     }
-    resp = requests.get("https://api.scraperapi.com/", params=payload, timeout=30)
+    resp = requests.get("https://api.scraperapi.com/", params=payload, timeout=60)
     soup = BeautifulSoup(resp.text, "html.parser")
 
     # 提取所有 href 中包含 scholar.google.com/citations?user= 的链接

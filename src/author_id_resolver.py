@@ -31,7 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--school", required=True, help="School name or alias")
     parser.add_argument("--teacher", required=True, help="Teacher name")
     parser.add_argument("--out-dir", default="output", help="Output directory")
-    parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout in seconds")
+    parser.add_argument("--timeout", type=int, default=60, help="HTTP timeout in seconds")
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -103,7 +103,7 @@ class AuthorIdResolver:
     def __init__(
         self,
         scraperapi_key: str,
-        timeout: int = 30,
+        timeout: int = 60,
         compound_surnames_path: Path = COMPOUND_SURNAMES_CONFIG_PATH,
     ):
         if not scraperapi_key:

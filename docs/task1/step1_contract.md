@@ -20,7 +20,7 @@ Step1 的目标是先固定契约与边界，避免后续实现阶段返工。
 ### AuthorIdResolver 输入
 - school: string，必填
 - teacher: string，必填
-- timeout: int，可选，默认30
+- timeout: int，可选，默认60
 
 约束:
 - school 必须能被 config/universities.json 归一化；否则抛 ValueError。
