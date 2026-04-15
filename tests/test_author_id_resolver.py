@@ -71,6 +71,35 @@ class TestAuthorIdResolverCacheIsolation(unittest.TestCase):
         self.assertEqual(before, after)
 
 
+class TestAuthorIdResolverTeacherNameNormalization(unittest.TestCase):
+    def test_normalize_chinese_name_to_given_name_first_pinyin_query(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        normalized = resolver._normalize_teacher_input("周志华")
+
+        self.assertEqual(normalized["teacher_query"], "Zhihua Zhou")
+        self.assertEqual(normalized["cache_teacher_name"], "周志华")
+        self.assertFalse(normalized["should_warn_ascii_input"])
+
+    def test_normalize_compound_surname_to_joined_family_name_pinyin(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        normalized = resolver._normalize_teacher_input("欧阳娜娜")
+
+        self.assertEqual(normalized["teacher_query"], "Nana Ouyang")
+        self.assertEqual(normalized["cache_teacher_name"], "欧阳娜娜")
+        self.assertFalse(normalized["should_warn_ascii_input"])
+
+    def test_normalize_ascii_input_keeps_original_query(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        normalized = resolver._normalize_teacher_input("tang jie")
+
+        self.assertEqual(normalized["teacher_query"], "tang jie")
+        self.assertIsNone(normalized["cache_teacher_name"])
+        self.assertTrue(normalized["should_warn_ascii_input"])
+
+
 @unittest.skip("当前策略默认取首个匹配结果；同名消歧回归用例暂不纳入门禁")
 class TestAuthorIdResolverDisambiguationRegression(unittest.TestCase):
     def test_should_select_curated_author_id_instead_of_blindly_using_first_candidate(self) -> None:
@@ -136,22 +165,7 @@ class TestAuthorIdResolverSearchQueryStrategy(unittest.TestCase):
 
 
 class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
-    def test_resolve_warns_when_teacher_input_is_non_ascii(self) -> None:
-        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
-
-        with TemporaryDirectory() as tmp_dir:
-            isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
-            with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
-                with patch("author_id_resolver.logger.warning") as mocked_warning:
-                    resolver.resolve(
-                        school="清华大学",
-                        teacher="许华哲",
-                        cache_path=isolated_cache,
-                    )
-
-        mocked_warning.assert_called_once()
-
-    def test_resolve_does_not_warn_when_teacher_input_is_ascii(self) -> None:
+    def test_resolve_warns_when_teacher_input_is_non_chinese(self) -> None:
         resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
 
         with TemporaryDirectory() as tmp_dir:
@@ -161,6 +175,22 @@ class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
                     resolver.resolve(
                         school="清华大学",
                         teacher="huazhe, xu",
+                        cache_path=isolated_cache,
+                    )
+
+        mocked_warning.assert_called_once()
+        self.assertFalse(isolated_cache.exists())
+
+    def test_resolve_does_not_warn_when_teacher_input_contains_chinese(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        with TemporaryDirectory() as tmp_dir:
+            isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
+            with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
+                with patch("author_id_resolver.logger.warning") as mocked_warning:
+                    resolver.resolve(
+                        school="清华大学",
+                        teacher="许华哲",
                         cache_path=isolated_cache,
                     )
 

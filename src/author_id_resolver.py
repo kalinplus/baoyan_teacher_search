@@ -8,17 +8,19 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import quote, unquote
 
 import requests
 from dotenv import load_dotenv
+from pypinyin import Style, pinyin
 
 from utils import configure_logging, get_logger
 
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 UNIVERSITY_CONFIG_PATH = ROOT_DIR / "config" / "universities.json"
+COMPOUND_SURNAMES_CONFIG_PATH = ROOT_DIR / "config" / "compound_surnames.json"
 SCRAPER_ENDPOINT = "https://api.scraperapi.com/"
 AUTHOR_ID_PATTERN = re.compile(r"scholar\.google\.com/citations\?user=([A-Za-z0-9_-]+)")
 logger = get_logger(__name__)
@@ -43,6 +45,28 @@ def load_university_mapping(config_path: Path) -> Dict[str, List[str]]:
     if not config_path.exists():
         raise FileNotFoundError(f"University mapping not found: {config_path}")
     return json.loads(config_path.read_text(encoding="utf-8"))
+
+
+def load_compound_surnames(config_path: Path) -> Set[str]:
+    if not config_path.exists():
+        raise FileNotFoundError(f"Compound surnames config not found: {config_path}")
+
+    raw_data = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(raw_data, list):
+        raise ValueError(f"Compound surnames config must be a JSON array: {config_path}")
+
+    normalized_surnames = set()
+    for item in raw_data:
+        if not isinstance(item, str):
+            raise ValueError(f"Compound surname must be a string: {item!r}")
+        surname = item.strip()
+        if not surname:
+            raise ValueError("Compound surname cannot be empty")
+        normalized_surnames.add(surname)
+
+    if not normalized_surnames:
+        raise ValueError(f"Compound surnames config is empty: {config_path}")
+    return normalized_surnames
 
 
 def normalize_text(value: str) -> str:
@@ -76,11 +100,17 @@ def save_json(path: Path, data: Dict[str, Any]) -> None:
 class AuthorIdResolver:
     """Resolve author_id from Google search results with local cache."""
 
-    def __init__(self, scraperapi_key: str, timeout: int = 30):
+    def __init__(
+        self,
+        scraperapi_key: str,
+        timeout: int = 30,
+        compound_surnames_path: Path = COMPOUND_SURNAMES_CONFIG_PATH,
+    ):
         if not scraperapi_key:
             raise RuntimeError("Missing environment variable: SCRAPERAPI_KEY")
         self.scraperapi_key = scraperapi_key
         self.timeout = timeout
+        self.compound_surnames = load_compound_surnames(compound_surnames_path)
         logger.debug("AuthorIdResolver initialized with timeout=%s", timeout)
 
     def resolve(
@@ -96,29 +126,39 @@ class AuthorIdResolver:
             raise ValueError("Teacher name cannot be empty")
         if teacher_name != teacher:
             logger.debug("Teacher name normalized from '%s' to '%s'", teacher, teacher_name)
-        if not self._is_ascii_text(teacher_name):
+
+        teacher_input = self._normalize_teacher_input(teacher_name)
+        teacher_query = teacher_input["teacher_query"]
+        cache_teacher_name = teacher_input["cache_teacher_name"]
+        if teacher_input["should_warn_ascii_input"]:
             logger.warning(
-                "Teacher query '%s' contains non-ASCII characters; Chinese-name search may be inaccurate",
+                "Teacher input '%s' is non-Chinese; skip cache write to avoid mixed-language cache keys",
                 teacher_name,
             )
+        else:
+            logger.debug("Teacher query normalized to pinyin '%s' from Chinese input '%s'", teacher_query, teacher_name)
 
         cache = load_json(cache_path)
-        cache_key = f"{school}::{teacher_name}"
         logger.debug("Loaded cache from %s, cache size=%s", cache_path, len(cache))
-        cached_author_id = cache.get(cache_key)
-        if cached_author_id:
-            logger.info("Cache hit for key=%s, author_id=%s", cache_key, cached_author_id)
-            return {
-                "author_id": cached_author_id,
-                "source": "author_id_cache",
-                "matched_school": school,
-                "matched_teacher": teacher_name,
-            }
+        cache_key: Optional[str] = None
+        if cache_teacher_name:
+            cache_key = f"{school}::{cache_teacher_name}"
+            cached_author_id = cache.get(cache_key)
+            if cached_author_id:
+                logger.info("Cache hit for key=%s, author_id=%s", cache_key, cached_author_id)
+                return {
+                    "author_id": cached_author_id,
+                    "source": "author_id_cache",
+                    "matched_school": school,
+                    "matched_teacher": teacher_name,
+                }
 
-        logger.info("Cache miss for key=%s, start querying search engine", cache_key)
+            logger.info("Cache miss for key=%s, start querying search engine", cache_key)
+        else:
+            logger.info("Skip cache for non-Chinese teacher input, start querying search engine")
 
         candidate_ids = self.search_candidates(
-            teacher=teacher_name,
+            teacher=teacher_query,
             school=school,
             school_aliases=school_aliases,
         )
@@ -132,9 +172,10 @@ class AuthorIdResolver:
             author_id,
             len(candidate_ids),
         )
-        cache[cache_key] = author_id
-        save_json(cache_path, cache)
-        logger.debug("Updated cache path=%s with key=%s", cache_path, cache_key)
+        if cache_key:
+            cache[cache_key] = author_id
+            save_json(cache_path, cache)
+            logger.debug("Updated cache path=%s with key=%s", cache_path, cache_key)
 
         return {
             "author_id": author_id,
@@ -161,6 +202,46 @@ class AuthorIdResolver:
     @staticmethod
     def _is_ascii_text(value: str) -> bool:
         return value.isascii()
+
+    @staticmethod
+    def _contains_cjk(value: str) -> bool:
+        return bool(re.search(r"[\u4e00-\u9fff]", value))
+
+    @staticmethod
+    def _split_chinese_name(name: str, compound_surnames: Set[str]) -> tuple[str, str]:
+        if len(name) >= 2 and name[:2] in compound_surnames:
+            return name[:2], name[2:]
+        return name[:1], name[1:]
+
+    @staticmethod
+    def _to_pinyin_syllables(value: str) -> List[str]:
+        syllables: List[str] = []
+        for item in pinyin(value, style=Style.NORMAL):
+            if not item or not item[0]:
+                continue
+            syllables.append(item[0].strip().lower())
+        return [syllable for syllable in syllables if syllable]
+
+    def _normalize_teacher_input(self, teacher_name: str) -> Dict[str, Any]:
+        if not self._contains_cjk(teacher_name):
+            return {
+                "teacher_query": teacher_name,
+                "cache_teacher_name": None,
+                "should_warn_ascii_input": True,
+            }
+
+        surname, given_name = self._split_chinese_name(teacher_name, self.compound_surnames)
+        surname_pinyin = "".join(self._to_pinyin_syllables(surname)).capitalize()
+        given_name_pinyin = "".join(self._to_pinyin_syllables(given_name)).capitalize()
+        teacher_query = " ".join([part for part in [given_name_pinyin, surname_pinyin] if part]).strip()
+        if not teacher_query:
+            raise ValueError(f"Cannot build pinyin query for teacher name: {teacher_name}")
+
+        return {
+            "teacher_query": teacher_query,
+            "cache_teacher_name": teacher_name,
+            "should_warn_ascii_input": False,
+        }
 
     @classmethod
     def _build_query_terms(cls, school: str, school_aliases: Optional[List[str]]) -> List[str]:
@@ -194,7 +275,7 @@ class AuthorIdResolver:
         teacher: str,
         school: str,
         school_aliases: Optional[List[str]] = None,
-        max_candidates: int = 2,
+        max_candidates: int = 1,
     ) -> List[str]:
         seen = set()
         author_ids: List[str] = []
