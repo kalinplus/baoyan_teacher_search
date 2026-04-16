@@ -14,6 +14,14 @@ Step 2: 实现教师名单抓取与清洗（按URL抓取、抽取姓名、去重
   - 产出物: `src/teacher_list_collector.py`（任务0抓取入口）、`output/teacher_pool/{学校}/{学院}/teachers.json`
   - 验收: 对单个学院执行后生成 `teachers.json`，包含非空 `teachers` 列表，且无重复姓名
 
+Step 2.1: 规则驱动改造（按站点适配，不追求一次通吃）
+  - 产出物: `docs/task0/step2_rule_driven_strategy.md`（策略与协作模板）、`src/teacher_list_collector.py`（支持按规则抓取）
+  - 验收: 至少 1 个学院页面准确抽取（导航词/分页词不进入 `teachers`）
+
+Step 2.2: 学院级规则迭代（逐页打通）
+  - 产出物: 针对每个学院页面的提取规则（可先内置在代码，后续再抽配置）
+  - 验收: 每新增 1 个学院，都有独立运行记录与结果抽样复核
+
 Step 3: 产出任务1可消费的批量输入清单
   - 产出物: `output/teacher_pool/all_teachers.jsonl`（每行至少含 `school`、`teacher`）
   - 验收: 文件可被逐行读取；随机抽样记录可追溯到对应学院来源
@@ -23,11 +31,13 @@ Step 3: 产出任务1可消费的批量输入清单
 - 不在任务0中实现 Google Scholar 查询（属于任务1）
 - 不跨步骤顺手优化
 - 新依赖需先确认
+- 不实现“万能解析器”；以稳定可复现为第一目标
 
 ### 参考
 - 任务描述: `docs/task_descs.md`
 - 现有主流程入口: `src/scholar_client.py`
 - 现有 author_id 解析模块: `src/author_id_resolver.py`
+- Step2 规则驱动方案: `docs/task0/step2_rule_driven_strategy.md`
 
 ### 自动化验收命令
 - 运行环境: conda 环境 `baoyan`
