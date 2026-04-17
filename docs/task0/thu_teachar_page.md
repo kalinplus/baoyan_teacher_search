@@ -85,9 +85,9 @@ URL：https://web.ee.tsinghua.edu.cn/en/list-text-all.jsp?urltype=tree.TreeTempU
 ```md
 学校：清华大学
 学院：深圳国际研究生院（计算机科学与技术方向）
-URL：https://www.sigs.tsinghua.edu.cn/893/list.htm
+URL：https://www.sigs.tsinghua.edu.cn/7644/list.htm
 分页类型：无（单页，表格形式）
 人名区域：HTML 表格 `<table>`，计算机科学与技术（学科代码 081200）对应行，姓名在第一列 `<td>` 文本中
 姓名样本：江勇、夏树涛、郑海涛、吴志勇、袁春
-限制：无登录，无验证码；⚠️ 该页为2021年版博士生导师表，仅含5名计算机方向导师，覆盖不全；建议同时参考 https://www.sigs.tsinghua.edu.cn/szdwlby/list.htm 获取更新的师资列表页
+限制：无登录，无验证码；但是单页中包含了所有学院的老师。如果要直接缩小筛选范围，需要在页面内点击进行选择；如果要选出计算机相关的导师，可能要根据研究兴趣进行过滤
 ```

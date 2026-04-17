@@ -23,5 +23,40 @@
     "school": "清华大学",
     "college": "计算机科学与技术系",
     "url": "https://www.cs.tsinghua.edu.cn/szzk/jzgml.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "软件学院",
+    "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "人工智能学院",
+    "url": "https://collegeai.tsinghua.edu.cn/rydw.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "交叉信息研究院",
+    "url": "https://iiis.tsinghua.edu.cn/rydw.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "网络科学与网络空间研究院",
+    "url": "https://www.insc.tsinghua.edu.cn/szdw_/jsml.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "自动化系",
+    "url": "https://www.au.tsinghua.edu.cn/zsjy/bdmd.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "电子工程系",
+    "url": "https://www.ee.tsinghua.edu.cn/ryqk/teacher/xxgdzyjs/js2.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "深圳国际研究生院（计算机科学与技术方向）",
+    "url": "https://www.sigs.tsinghua.edu.cn/7644/list.htm"
   }
 ]
