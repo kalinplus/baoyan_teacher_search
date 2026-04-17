@@ -18,5 +18,10 @@
     "school": "北京大学",
     "college": "计算机学院 & 王选计算机研究所",
     "url": "https://cs.pku.edu.cn/szdw/jyxl/amz/ALL.htm"
+  },
+  {
+    "school": "清华大学",
+    "college": "计算机科学与技术系",
+    "url": "https://www.cs.tsinghua.edu.cn/szzk/jzgml.htm"
   }
 ]

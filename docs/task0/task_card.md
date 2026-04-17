@@ -51,8 +51,8 @@ conda run -n baoyan python -c "import json;d=json.load(open('docs/task0/source_u
 
 Step2:
 ```bash
-conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机系 --out-dir output/teacher_pool
-conda run -n baoyan python -c "import json;d=json.load(open('output/teacher_pool/清华大学/计算机系/teachers.json','r',encoding='utf-8'));print(len(d.get('teachers',[]))>0 and len(d.get('teachers',[]))==len(set(d.get('teachers',[]))))"
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机科学与技术系 --out-dir output/teacher_pool
+conda run -n baoyan python -c "import json;d=json.load(open('output/teacher_pool/清华大学/计算机科学与技术系/teachers.json','r',encoding='utf-8'));print(len(d.get('teachers',[]))>0 and len(d.get('teachers',[]))==len(set(d.get('teachers',[]))))"
 ```
 
 Step3:

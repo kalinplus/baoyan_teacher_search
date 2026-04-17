@@ -92,6 +92,31 @@ conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周�
 
 - `publications_truncated=true` 表示当前发文统计可能被单次抓取窗口截断（存在下一页）；`false` 表示当前请求未检测到下一页
 
+## 任务0 Step2（规则驱动教师名单抓取）
+
+入口脚本：`src/teacher_list_collector.py`
+
+当前已实现规则：
+
+- 清华大学 计算机科学与技术系（`https://www.cs.tsinghua.edu.cn/szzk/jzgml.htm`）
+- 规则：从 `h2 > a` 提取姓名文本，做去重和黑名单过滤后输出
+
+执行示例：
+
+```bash
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机科学与技术系 --out-dir output/teacher_pool
+```
+
+输出路径：
+
+- `output/teacher_pool/{学校}/{学院}/teachers.json`
+
+可选导出任务1批量输入：
+
+```bash
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机科学与技术系 --out-dir output/teacher_pool --export-jsonl output/teacher_pool/all_teachers.jsonl
+```
+
 ## 自动化验收命令
 
 - Step1
