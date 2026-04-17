@@ -1,56 +1,124 @@
 ## 总体描述
-一个 CLI 工具，甚至初步就是一个脚本作为入口就行。
-输入，我希望就是学校+姓名，输出，则是其基本信息、学术相关的结构化信息、以及可能的推荐程度等等。
+目标是做一个可批量运行的 CLI 工具（初期脚本即可）。
+输入是学校+学院教师池（批量）或学校+姓名（单人），输出包括三层信息：
+- 基本信息（主页/邮箱/实验室/招生信号等）
+- 学术结构化信息（Google Scholar）
+- 推荐程度（综合排序）
 
-## 任务0：获取教师列表
-- 我提供学校+学院+教师列表 url（网页端 LLM 可以方便的完成），本地维护一个数据文件记录，然后本地爬虫去把教师姓名都爬下来并存储
+核心原则：先用低成本信息做预筛，再用付费 API 做精筛，控制配额消耗。
 
-## 任务1：获取结构化信息 
-- 根据老师的“学校+姓名“，使用 SCRAPERAPI_KEY 搜索，获取其 google scholar author id
-- 根据 author id，使用 SERPAPI_KEY 的接口，获取老师的结构化信息
+## 推荐执行链路（重新整理）
+1. 任务0：获取教师池（名单）
+2. 任务1：获取基本信息并预筛（新增前置核心阶段）
+3. 任务2：获取 Google Scholar 结构化信息（仅对预筛后的候选）
+4. 任务3：匹配度分析与推荐排序
+5. 任务4：CLI / GUI 封装
 
-可能的注意点：
-- 两个 API Key 用量不足。一般不会出现，至少我会想办法付费的
-- 本地缓存，这个有必要实现。只缓存 author id 就行，避免重复查询
-- 当前已实现获取 google scholar author id 的独立模块：src/author_id_resolver.py（AuthorIdResolver）。
-- 当前主流程已接入：src/scholar_client.py 中可直接使用学校+姓名自动发现 author id，并交给 ScholarAuthorClient 获取结构化信息。
-- 当前查询策略已收敛为单次查询：`site:scholar.google.com/citations + 学校英文缩写 + 用户输入的老师名`。
-- 用户输入老师名若包含中文会给 warning（提示准确性风险），但仍按用户输入继续查询。
-- `pypinyin` 暂不引入，作为可选增强项后续评估（新增依赖前需审批）。
-- 当前支持通过 `--log-level DEBUG` 输出 author_id 解析全链路日志（入参、缓存命中/未命中、查询词、请求页、正则命中、最终写缓存）。
-- 发文相关统计基于当前 author 结果页抓取窗口；输出 `publications_truncated` 标记是否可能存在分页截断。
-- 结构化信息的具体字段，好像被删了，查看"output/南京大学/周志华"目录下的结果作为参考，然后写到文档里吧
+## 任务0：获取教师列表（Teacher Pool）
+- 输入：学校+学院+教师列表 URL（本地维护数据文件）
+- 处理：抓取整页 HTML，自动识别教师条目并提取基础字段（姓名、教师主页 URL、邮箱、研究兴趣、职称），再清洗去重
+- 输出：按学院落盘教师池，供后续任务消费（兼容旧字段 + 新增结构化资料）
+
+当前现状：
+- 已有规则驱动抓取能力，清华多学院已打通。
+- 当前多数规则仅稳定抽取姓名，尚未统一抽取主页/邮箱/兴趣等字段；该项将作为任务0下一阶段改造重点。
+- 执行策略改为“自动识别优先，站点规则兜底”，不再依赖人工先提供页面结构说明。
+
+任务0输出契约（目标形态）：
+- 保留现有 teachers（纯姓名列表），保证向后兼容
+- 新增 teacher_profiles（结构化列表），每项至少包含：
+	- name
+	- profile_url（若页面无详情页则为 null）
+	- email（若页面可提取则为邮箱，否则为 null）
+	- interests（列表页可提取的研究方向关键词数组）
+	- title（教授/副教授/助理教授等，无法识别时为 null）
+	- source_url（该老师被发现的列表页）
+
+## 任务1：获取基本信息并预筛（前置于结构化信息）
+这是新的关键阶段，目标是减少后续 API 请求规模。
+
+### 1. 输入
+- 任务0输出的教师池（学校/学院/姓名/列表页URL）
+- 已联系老师名单（命中即硬跳过）
+- 可选：学院优先级、个人方向关键词
+
+### 2. 处理
+- 从列表页或教师主页提取基础信号：
+	- 主页链接是否可用
+	- 邮箱是否公开
+	- 职称/岗位关键词（教授/副教授/研究员等）
+	- 招生相关关键词（招生、招收、prospective students 等）
+	- 近期活跃信号（近年新闻/论文/项目）
+	- 研究方向关键词匹配度
+- 生成预筛分数与原因标签
+- 输出候选优先级列表（Top N 进入任务2）
+
+### 3. 输出
+- 预筛结果（包含分数、特征、排序理由、是否跳过）
+- 跳过原因（已联系/信息不足/超出预算）
+
+备注：
+- 该阶段优先用学校站点公开页面完成，通常无 API 成本或低成本。
+- 这一步不是替代 Scholar，而是为 Scholar 调用“控量+提质”。
+- 优先使用任务0已抽取的 teacher_profiles 字段，减少重复页面请求。
+
+## 任务2：获取 Google Scholar 结构化信息（精筛阶段）
+仅对任务1输出的候选老师执行，避免全量调用。
+
+### 当前实现（已具备）
+- 基于学校+姓名自动解析 author_id：src/author_id_resolver.py
+- 基于 author_id 获取结构化信息：src/scholar_client.py
+- 已实现 author_id 本地缓存（避免重复搜索）
+- 支持 DEBUG 日志追踪解析链路
+- 查询策略：单次查询 `site:scholar.google.com/citations + 学校英文缩写 + 老师检索词`
+- 中文姓名检索词已通过 pypinyin 转写（含复姓配置）
+
+### result.json 关键字段（当前契约）
+- author_id
+- name
+- affiliations
+- email
+- interests
+- citations_all
+- citations_last_1y
+- citations_last_3y
+- citations_last_5y
+- publications_total
+- publications_last_1y
+- publications_last_3y
+- publications_last_5y
+- publications_truncated
+- h_index_all
+- i10_index_all
+- source
+- matched_school
+- matched_teacher
 
 参考 API 文档：
 
-**ScraperAPI：**
+ScraperAPI：
 - 通用代理端点（用于抓 Google Search）：<https://docs.scraperapi.com/synchronous-apis/using-the-api-endpoint>
 - Google Search 结构化端点（参考）：<https://docs.scraperapi.com/structured-data-endpoints/search-and-insights/google/google-serp-api>
 - 结构化端点总览：<https://docs.scraperapi.com/structured-data-endpoints>
 
-**SerpApi：**
+SerpApi：
 - Google Scholar 主文档：<https://serpapi.com/google-scholar-api>
 - Google Scholar Author 引擎：<https://serpapi.com/google-scholar-author-api>
 
+## 任务3：匹配度分析与推荐排序
+分两层：
+1. 规则层：用兴趣关键词、研究方向、院校/学院偏好、学术指标做初步打分
+2. LLM 层：输入简历（md）与老师画像，输出解释型匹配建议
 
-## 任务2：获取基本信息
-基本信息，比如学校、学院、邮箱、研究兴趣（可能 google scholar 里也有），这些是基本的。
-还有一些进阶的，比如近期 selected paper, 实验室成员和去向，项目，主页的额外通知、要求。当然首先要先找到主页。
-
-找主页，有两个基本想法：
-1. SCRAPERAPI_KEY 直接搜索，看返回结果。根据我用搜索引擎的经验，学校主页和个人主页都是有可能出来的，可能都要看，毕竟有的老师弄前者，有的后者，有的干脆没有后者，比较千人千面
-2. google scholar 上很多老师会放主页链接？不知道能不能一起爬下来，也不知道是不是所有老师都放，要确认
-
-TODO（下一步）
-- 支持从输入文件读取多位老师名单，按记录批量执行抓取流程（学校归一化 -> author_id 解析 -> 结构化信息输出）。
-- 输入文件形式暂不固定，后续讨论（候选：txt/csv/json）。
-- 批量模式先复用现有单老师输出契约与目录结构，避免引入额外字段变更。
-
-## 任务3：匹配度分析
-有两个层级：
-1. 你写一些你的期望方向，用关键词、同义词、近义词匹配之类的方法（直接你多写一点就行，简化实现），匹配老师的研究兴趣，缺点是精度可能不高。以及可以用一些院校、引用量之类的，做一些筛选
-
-2. 传一份 md 简历，让 LLM 帮你匹配。prompt 要设计一下
+建议将任务1和任务2的特征统一到一个评分输入，避免重复排序逻辑。
 
 ## 任务4：CLI 甚至 GUI 包装
-...
+- CLI 先行，保障可批处理与可复跑
+- GUI 作为后续增强，不影响主链路
+
+## 当前优先 TODO（按执行顺序）
+1. 任务0改造：新增“整页自动识别 + teacher_profiles（姓名/主页/邮箱/兴趣/职称）”
+2. 增加“已联系名单”并在任务1做硬跳过
+3. 实现任务1预筛排序，优先使用 URL 可达的主页信号，输出 Top N 候选
+4. 任务2仅消费 Top N，控制 API 配额
+5. 再做任务3综合推荐

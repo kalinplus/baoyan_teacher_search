@@ -9,7 +9,7 @@ from typing import List
 
 import requests
 
-from teacher_list_core import Rule
+from teacher_list_core import Rule, TeacherProfile
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -91,9 +91,69 @@ def extract_thu_thss_faculty_names(html: str) -> List[str]:
     return [strip_html_tags(unescape(name)).strip() for name in candidates]
 
 
+def extract_thu_thss_faculty_profiles(html: str, source_url: str) -> List[TeacherProfile]:
+    pattern = re.compile(
+        r"<a[^>]*href=[\"'](\.\./faculty/[^\"'#?]+\.htm)[\"'][^>]*>(.*?)</a>",
+        re.IGNORECASE | re.DOTALL,
+    )
+    profiles: List[TeacherProfile] = []
+    for href, name_html in pattern.findall(html):
+        name = strip_html_tags(unescape(name_html)).strip()
+        profiles.append(
+            TeacherProfile(
+                name=name,
+                profile_url=href,
+                email=None,
+                interests=[],
+                title=None,
+                source_url=source_url,
+            )
+        )
+    return profiles
+
+
 def extract_thu_ai_fulltime_pi_names(html: str) -> List[str]:
     section = _extract_between_anchors(html, start_anchor="sz2", end_anchor="sz3")
     return _extract_h4_names(section)
+
+
+def extract_thu_ai_fulltime_pi_profiles(html: str, source_url: str) -> List[TeacherProfile]:
+    section = _extract_between_anchors(html, start_anchor="sz2", end_anchor="sz3")
+    pattern = re.compile(r"<a[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
+    profiles: List[TeacherProfile] = []
+
+    for href, block_html in pattern.findall(section):
+        headings = re.findall(r"<h4[^>]*>(.*?)</h4>", block_html, flags=re.IGNORECASE | re.DOTALL)
+        if not headings:
+            continue
+
+        name = strip_html_tags(unescape(headings[0])).strip()
+        title_match = re.search(r"<p[^>]*>(.*?)</p>", block_html, flags=re.IGNORECASE | re.DOTALL)
+        title = strip_html_tags(unescape(title_match.group(1))).strip() if title_match else None
+
+        interests_heading = re.search(
+            r"<h4[^>]*class=[\"'][^\"']*h4s2[^\"']*[\"'][^>]*>(.*?)</h4>",
+            block_html,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        interests_text = strip_html_tags(unescape(interests_heading.group(1))).strip() if interests_heading else ""
+        interests = [part.strip() for part in re.split(r"[、,，;；/|]+", interests_text) if part.strip()]
+
+        email_match = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+", block_html)
+        email = email_match.group(0).lower() if email_match else None
+
+        profiles.append(
+            TeacherProfile(
+                name=name,
+                profile_url=href,
+                email=email,
+                interests=interests,
+                title=title,
+                source_url=source_url,
+            )
+        )
+
+    return profiles
 
 
 def extract_thu_iiis_fulltime_and_research_names(html: str) -> List[str]:
@@ -213,11 +273,13 @@ def get_rules() -> List[Rule]:
             name="thu_thss_faculty_anchor",
             matcher=supports_thu_thss,
             extractor=extract_thu_thss_faculty_names,
+            profile_extractor=extract_thu_thss_faculty_profiles,
         ),
         Rule(
             name="thu_ai_fulltime_pi_h4",
             matcher=supports_thu_ai,
             extractor=extract_thu_ai_fulltime_pi_names,
+            profile_extractor=extract_thu_ai_fulltime_pi_profiles,
         ),
         Rule(
             name="thu_iiis_fulltime_research_h4",

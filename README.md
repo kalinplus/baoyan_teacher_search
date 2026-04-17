@@ -30,16 +30,16 @@ pip install -r requirements.txt
 conda run -n baoyan python src/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 ```
 
-开启详细日志（便于排查 author_id 获取过程）：
-
-```bash
-conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output --log-level DEBUG
-```
-
 显式 author_id 模式（可选）：
 
 ```bash
 conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周志华 --author-id rSVIHasAAAAJ --out-dir output
+```
+
+仅获取 author_id 过程，且开启详细日志（便于排查 author_id 获取过程）：
+
+```bash
+conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output --log-level DEBUG
 ```
 
 ## 输出路径
@@ -124,7 +124,11 @@ conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周�
 
 当前待办：
 
-- 任务1执行前需要先做老师名单预过滤（例如按导师类型、职称、关键词、近年活跃度等）以控制 API 调用次数，避免超过配额。
+- 任务0输出升级为 `teachers + teacher_profiles`：
+	- `teachers` 保持向后兼容（纯姓名列表）
+	- `teacher_profiles` 至少包含 `name/profile_url/source_url`，并尽可能补充 `email/interests/title`
+- 提取策略升级为“自动整页识别优先、站点规则兜底”，不依赖人工先提供页面结构说明。
+- 完成任务0升级后，再进行任务1预过滤（按主页/邮箱/职称/兴趣等信号）以控制 API 调用次数，避免超过配额。
 
 执行示例：
 

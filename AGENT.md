@@ -79,3 +79,5 @@
 - [2026-04-17] [将SIGS过滤从多字段关键词改为固定subject白名单（exField5），并按全量subject统计更新过滤词；重抓后名单由14增至29且保留核心样本姓名] [如需可将SIGS subject白名单外置到配置文件并增加白名单变更审计]
 - [2026-04-17] [已将SIGS subject白名单外置到 config/sigs_subject_keywords.json，并改为运行时读取配置；测试与重抓通过，SIGS名单维持29人] [后续可为关键词配置增加文档说明和变更流程]
 - [2026-04-17] [完成清华任务0整体进展总结并同步 README/task_card/task1-progress 文档与 repo memory；新增“任务1前置老师预过滤以节省API配额”待办] [后续实现预过滤策略并评估配额节省效果]
+- [2026-04-17] [根据任务2前置预筛需求，重整任务拆分并将任务0契约升级为“姓名+详情URL 双采集（teacher_profiles）”文档方案，补齐任务卡与规则驱动验收标准] [后续按新契约实现 teacher_list_collector 与提取器返回 name+profile_url 并完成兼容验证]
+- [2026-04-17] [基于人工智能学院页面卡片示例，进一步将任务0策略升级为“自动整页识别优先，站点规则兜底”，并将 teacher_profiles 目标字段扩展为 name/profile_url/email/interests/title/source_url，同步 README/task_descs/task0 文档定位] [后续实现页面探针与富字段抽取，并以清华页面做回归验证]

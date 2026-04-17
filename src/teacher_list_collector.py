@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""Task0 Step2: collect teacher names from college list pages with site-specific rules."""
+"""Task0 Step2: collect teacher names and rich profiles from college list pages."""
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from teacher_extractors import get_rules
-from teacher_extractors.thu import extract_thu_cs_h2_anchor_names
 from teacher_list_core import (
-    clean_teacher_names,
     collect_teachers,
     export_jsonl,
-    fetch_html,
     save_result,
     select_records,
 )
@@ -50,11 +48,28 @@ def main() -> int:
     records = select_records(args)
     out_dir = Path(args.out_dir)
 
-    results = [collect_teachers(record, timeout=args.timeout, rules=rules, logger=logger) for record in records]
-    for payload in results:
-        saved = save_result(out_dir, payload)
-        logger.info("Saved teacher list: %s", saved)
-        print(f"Saved: {saved}")
+    results = []
+    allow_partial_export = bool(args.export_jsonl) and not args.school and not args.college and not args.url
+
+    for record in records:
+        try:
+            payload = collect_teachers(record, timeout=args.timeout, rules=rules, logger=logger)
+            saved = save_result(out_dir, payload)
+            logger.info("Saved teacher list: %s", saved)
+            print(f"Saved: {saved}")
+            results.append(payload)
+        except Exception as exc:
+            if not allow_partial_export:
+                raise
+
+            cached_path = out_dir / record.school / record.college / "teachers.json"
+            if cached_path.exists():
+                cached_payload = json.loads(cached_path.read_text(encoding="utf-8"))
+                logger.warning("Collect failed, fallback cached result %s, reason=%s", cached_path, exc)
+                results.append(cached_payload)
+                continue
+
+            logger.warning("Collect failed and no cached result, skip %s/%s, reason=%s", record.school, record.college, exc)
 
     if args.export_jsonl:
         export_path = Path(args.export_jsonl)
