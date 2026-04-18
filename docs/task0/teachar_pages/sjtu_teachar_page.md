@@ -7,12 +7,12 @@
 学院：计算机学院（网络空间安全学院、密码学院）
 URL：https://www.cs.sjtu.edu.cn/jiaoshiml.html
 分页类型：无（单页）
-人名区域：主站页面可访问，但直接抓取未稳定命中教师姓名样本；页面存在“教师/师资/jiaoshiml”等标识。备用入口为旧版 CSE 静态页 `https://cs.sjtu.edu.cn/cse/People.aspx`（可命中姓名，非全量）
-姓名样本（来自 CSE 旧页）：刘雨桐、赵涵、胡云聪、易冉、斯雪明、张杰琳、何哲陟、郑臻哲、戴文睿、林云
-限制：建议将 `jiaoshiml.html` 作为主入口、`People.aspx` 作为兜底入口；如后续需全量高置信覆盖，可补浏览器自动化抓取
-验证结果：部分通过（主页 HTTP 200；命中“教师/师资/jiaoshiml”，但未直接命中预设姓名样本）
+人名区域：主站在浏览器渲染后的 `body` 中可见完整 `rc-list -> rc-item` 结构；每个研究所包含“所长/副所长 + name-list”教师锚点，主页链接为 `https://www.cs.sjtu.edu.cn/jiaoshiml/*.html`。
+姓名样本（来自主站 body 快照）：臧斌宇、陈榕、糜泽羽、俞凯、赵涵、胡云聪、郑臻哲、林云、郁昱、张少霆
+限制：直接抓取 `jiaoshiml.html` 初始 HTML 仍可能只拿到壳页面；当前通过调用官方 AJAX 接口 `active/ajax_teacher_list.html` 可稳定获取教师名录，同时保留 `People.aspx` 兜底。
+验证结果：通过（AJAX 接口稳定抽取 19 个研究所、293 位教师；其中 290 位含主页链接，3 位缺少 `href`）
 补充页验证：
-- https://cs.sjtu.edu.cn/cse/People.aspx（HTTP 200；命中证据=People/Faculty、刘雨桐/赵涵/胡云聪）
+- https://cs.sjtu.edu.cn/cse/People.aspx（HTTP 200；作为接口不稳定时的可用兜底）
 ```
 
 ---

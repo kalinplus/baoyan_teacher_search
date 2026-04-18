@@ -22,8 +22,16 @@ from teacher_extractors.thu import (
     extract_thu_thss_faculty_profiles,
     extract_thu_thss_faculty_names,
 )
+from teacher_extractors.sjtu import (
+    extract_sjtu_cs_main_profiles,
+    extract_sjtu_cse_people_profiles,
+    extract_sjtu_gc_profiles,
+    extract_sjtu_gift_profiles,
+    extract_sjtu_soai_spkz_profiles,
+    extract_sjtu_soai_zzjs_profiles,
+)
 from teacher_list_core import clean_teacher_names, fetch_html
-from teacher_list_core import Rule, SourceRecord, collect_teachers, export_jsonl, extract_name_from_anchor_text
+from teacher_list_core import Rule, SourceRecord, TeacherProfile, collect_teachers, export_jsonl, extract_name_from_anchor_text
 
 
 class _FakeResponse:
@@ -38,6 +46,17 @@ class _FakeResponse:
     @property
     def text(self) -> str:
         return self.content.decode(self.encoding, errors="replace")
+
+
+class _FakeJsonResponse:
+    def __init__(self, payload):
+        self.payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self):
+        return self.payload
 
 
 class TestTeacherListCollectorRules(unittest.TestCase):
@@ -188,6 +207,146 @@ class TestTeacherListCollectorRules(unittest.TestCase):
 
         self.assertEqual(names, ["夏树涛", "郑海涛", "杨余久"])
 
+    def test_extract_sjtu_soai_profiles_filters_navigation_links(self) -> None:
+        html = """
+        <a href="/cn/article/dsj">大事记</a>
+        <a href="/cn/list/sydh">生涯导航</a>
+        <a href="/cn/facultydetails/zzjs/caoqinxiang">曹钦翔</a>
+        <div>副教授</div>
+        <div>caoqinxiang@sjtu.edu.cn</div>
+        """
+
+        profiles = extract_sjtu_soai_zzjs_profiles(html, source_url="https://soai.sjtu.edu.cn/cn/faculty/zzjs")
+
+        self.assertEqual([p.name for p in profiles], ["曹钦翔"])
+        self.assertEqual(profiles[0].profile_url, "/cn/facultydetails/zzjs/caoqinxiang")
+        self.assertEqual(profiles[0].title, "副教授")
+        self.assertEqual(profiles[0].email, "caoqinxiang@sjtu.edu.cn")
+
+    def test_extract_sjtu_cse_people_profiles(self) -> None:
+        html = """
+        <div class="PeopleList">
+            <ul>
+                <li>
+                    <div class="w130 fr">
+                        <h2>刘雨桐</h2>
+                        <p>研究领域：无线感知，多模态融合，态势感知</p>
+                        <span><a href="PeopleDetail.aspx?id=466">了 解更多</a></span>
+                    </div>
+                </li>
+                <li>
+                    <div class="w130 fr">
+                        <h2>赵涵</h2>
+                        <p>研究领域：云计算，计算机系统，并行分布式计算</p>
+                        <span><a href="PeopleDetail.aspx?id=465">了 解更多</a></span>
+                    </div>
+                </li>
+            </ul>
+        </div>
+        """
+
+        profiles = extract_sjtu_cse_people_profiles(html, source_url="https://cs.sjtu.edu.cn/cse/People.aspx?id=9")
+
+        self.assertEqual([p.name for p in profiles], ["刘雨桐", "赵涵"])
+        self.assertEqual(profiles[0].profile_url, "PeopleDetail.aspx?id=466")
+        self.assertIn("无线感知", profiles[0].interests)
+
+    def test_extract_sjtu_cs_main_profiles_uses_ajax_content(self) -> None:
+        ajax_content = """
+        <div class="rc-item">
+            <div class="tit">
+                <div class="name">并行与分布式系统研究所</div>
+            </div>
+            <div class="dt">
+                <p>所长：<a href="https://www.cs.sjtu.edu.cn/jiaoshiml/zangbinyu.html">臧斌宇</a></p>
+                <p>副所长：<a>John Edward Hopcroft</a></p>
+            </div>
+            <div class="name-list">
+                <span><a href="https://www.cs.sjtu.edu.cn/jiaoshiml/chenhaibo.html">陈海波</a></span>
+                <span>孟 魁</span>
+            </div>
+        </div>
+        """
+        fake_response = _FakeJsonResponse(payload={"content": ajax_content, "tab_html": ""})
+
+        with patch("teacher_extractors.sjtu.requests.post", return_value=fake_response), patch(
+            "teacher_extractors.sjtu.fetch_html",
+            side_effect=AssertionError("Fallback page should not be used when ajax has data"),
+        ):
+            profiles = extract_sjtu_cs_main_profiles(
+                "<html></html>",
+                source_url="https://www.cs.sjtu.edu.cn/jiaoshiml.html",
+            )
+
+        names = [profile.name for profile in profiles]
+        self.assertIn("臧斌宇", names)
+        self.assertIn("陈海波", names)
+        self.assertIn("John Edward Hopcroft", names)
+        self.assertIn("孟魁", names)
+
+        profile_map = {profile.name: profile for profile in profiles}
+        self.assertEqual(
+            profile_map["臧斌宇"].profile_url,
+            "https://www.cs.sjtu.edu.cn/jiaoshiml/zangbinyu.html",
+        )
+        self.assertIsNone(profile_map["John Edward Hopcroft"].profile_url)
+        self.assertEqual(profile_map["陈海波"].interests, ["并行与分布式系统研究所"])
+
+    def test_extract_sjtu_soai_spkz_profiles_from_show_cards(self) -> None:
+        html = """
+        <div class="teamList" id="divresult">
+            <ul>
+                <li>
+                    <a href="/cn/show/369" target="_blank" class="pd">
+                        <div class="text">
+                            <div class="h3">糜泽羽</div>
+                            <div class="p">职称：副教授<br />邮箱：yzmizeyu@sjtu.edu.cn<br /></div>
+                        </div>
+                    </a>
+                </li>
+            </ul>
+        </div>
+        <a href="http://www.echaoweb.com/">上海屹超</a>
+        """
+
+        profiles = extract_sjtu_soai_spkz_profiles(html, source_url="https://soai.sjtu.edu.cn/cn/teacher/spkz")
+
+        self.assertEqual([p.name for p in profiles], ["糜泽羽"])
+        self.assertEqual(profiles[0].profile_url, "/cn/show/369")
+        self.assertEqual(profiles[0].email, "yzmizeyu@sjtu.edu.cn")
+
+    def test_extract_sjtu_gift_profiles_filters_non_teacher_links(self) -> None:
+        html = """
+        <a href="/joinus">加入我们</a>
+        <a href="/faculty?category=双聘/客座">双聘</a>
+        <a href="/faculty/40842">鲍华</a>
+        <div>教授</div>
+        <div>hua.bao@sjtu.edu.cn</div>
+        """
+
+        profiles = extract_sjtu_gift_profiles(html, source_url="https://gift.sjtu.edu.cn/faculty")
+
+        self.assertEqual([p.name for p in profiles], ["鲍华"])
+        self.assertEqual(profiles[0].profile_url, "/faculty/40842")
+        self.assertEqual(profiles[0].email, "hua.bao@sjtu.edu.cn")
+
+    def test_extract_sjtu_gc_profiles_filters_non_teacher_links(self) -> None:
+        html = """
+        <a href="/about/job-opportunities/">Job Opportunities</a>
+        <a href="/about/faculty-staff/faculty-directory/faculty-detail/24">Youyi Bi</a>
+        <div>youyi.bi@sjtu.edu.cn</div>
+        <a href="/about/faculty-staff/faculty-directory/">Meet Us</a>
+        """
+
+        profiles = extract_sjtu_gc_profiles(
+            html,
+            source_url="https://gc.sjtu.edu.cn/about/faculty-staff/faculty-directory/",
+        )
+
+        self.assertEqual([p.name for p in profiles], ["Youyi Bi"])
+        self.assertEqual(profiles[0].profile_url, "/about/faculty-staff/faculty-directory/faculty-detail/24")
+        self.assertEqual(profiles[0].email, "youyi.bi@sjtu.edu.cn")
+
     def test_collect_teachers_outputs_teacher_profiles_contract(self) -> None:
         html = """
         <a href="/faculty/zhangsan.htm">
@@ -229,6 +388,36 @@ class TestTeacherListCollectorRules(unittest.TestCase):
 
         self.assertEqual(payload["teachers"], ["王五", "赵六"])
         self.assertEqual(len(payload.get("teacher_profiles", [])), 2)
+
+    def test_collect_teachers_prefers_higher_quality_fallback(self) -> None:
+        html = """
+        <a href="/cn/article/dsj">大事记</a>
+        <a href="/cn/list/sydh">生涯导航</a>
+        """
+        response = _FakeResponse(content=html.encode("utf-8"), encoding="utf-8", apparent_encoding="utf-8")
+        record = SourceRecord(school="上海交通大学", college="人工智能学院", url="https://soai.sjtu.edu.cn/cn/faculty/zzjs")
+        fallback_profiles = [
+            TeacherProfile(
+                name="曹钦翔",
+                profile_url="/cn/facultydetails/zzjs/caoqinxiang",
+                email="caoqinxiang@sjtu.edu.cn",
+                interests=["机器学习"],
+                title="副教授",
+                source_url=record.url,
+            )
+        ]
+        rule = Rule(
+            name="quality_fallback_rule",
+            matcher=lambda _: True,
+            extractor=lambda _: [],
+            profile_extractor=lambda _html, _url: fallback_profiles,
+        )
+
+        with patch("teacher_list_core.requests.get", return_value=response):
+            payload = collect_teachers(record, timeout=30, rules=[rule], logger=self)
+
+        self.assertEqual(payload["teachers"], ["曹钦翔"])
+        self.assertEqual(payload["teacher_profiles"][0]["profile_url"], "https://soai.sjtu.edu.cn/cn/facultydetails/zzjs/caoqinxiang")
 
     def test_collect_teachers_auto_ignores_navigation_like_names(self) -> None:
         html = """

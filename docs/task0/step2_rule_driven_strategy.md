@@ -99,6 +99,11 @@
   - 区间：`sz2 -> sz3`
   - 从人员卡片解析 `name/profile_url/email/interests/title`
   - 仅在自动流程失败或明显劣化时启用
+- 在 `src/teacher_extractors/sjtu.py` 中，新增上海交通大学兜底规则：
+  - `soai.sjtu.edu.cn/cn/faculty/zzjs`：仅提取 `facultydetails` 人员卡片链接并解析 `email/title/interests`
+  - `soai.sjtu.edu.cn/cn/teacher/spkz`：复用卡片提取逻辑，过滤导航链接与无富字段噪音项
+  - `www.cs.sjtu.edu.cn/jiaoshiml.html`：优先调用 AJAX 接口 `active/ajax_teacher_list.html` 解析名录；若接口结果为空再回退到 CSE 旧页 `People.aspx?id=9`
+  - `cs.sjtu.edu.cn/cse/People.aspx`：从 `PeopleList` 解析 `h2姓名 + PeopleDetail链接 + 研究领域`
 
 ### Milestone A: 规则框架落地
 - 改造 `src/teacher_list_collector.py`，新增页面探针与自动提取流程。

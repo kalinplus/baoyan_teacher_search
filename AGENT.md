@@ -83,3 +83,4 @@
 - [2026-04-17] [基于人工智能学院页面卡片示例，进一步将任务0策略升级为“自动整页识别优先，站点规则兜底”，并将 teacher_profiles 目标字段扩展为 name/profile_url/email/interests/title/source_url，同步 README/task_descs/task0 文档定位] [后续实现页面探针与富字段抽取，并以清华页面做回归验证]
 - [2026-04-18] [完成北大重点院系师资页在线校验（状态码/title/样本命中）并新增 docs/task0/pku_teachar_page.md 记录；同步标注 AAIS 当前网络可达性受限] [后续按该记录将北大院系逐步接入 source_urls 与提取规则回归]
 - [2026-04-18] [完成上海交通大学5个关键院系教师页校验并新增 docs/task0/sjtu_teachar_page.md；补充人工智能研究院(ai)与人工智能学院(soai)机构区分与采集建议] [后续可将 SJTU 来源同步到 source_urls.json 并执行规则回归抓取]
+- [2026-04-18] [完成 SJTU 计算机学院主入口 AJAX 抓取修复并同步 README/task_descs/task0/task1 文档口径；将下一优先计划设定为“老师主页信号 + Google Scholar 结构化信息融合，产出可用参考与推荐”] [下一步细化融合特征与排序方案后再进入实现]

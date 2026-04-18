@@ -28,6 +28,7 @@ NAVIGATION_BLACKLIST = {
     "师资队伍",
 }
 CHINESE_NAME_PATTERN = re.compile(r"^[\u4e00-\u9fff]{2,4}$")
+ENGLISH_NAME_PATTERN = re.compile(r"^[A-Z][A-Za-z'\-]{1,30}(?:\s+[A-Z][A-Za-z'\-]{1,30}){1,3}$")
 EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+")
 TITLE_PATTERN = re.compile(
     r"(讲席教授|助理教授|副教授|教授|副研究员|研究员|工程师|长聘副教授|长聘教授|院长助理|博士后)"
@@ -118,8 +119,33 @@ NAME_NOISE_KEYWORDS = (
     "运行",
     "流动",
 )
+ENGLISH_NAME_NOISE_KEYWORDS = (
+    "english",
+    "home",
+    "faculty",
+    "directory",
+    "news",
+    "research",
+    "contact",
+    "login",
+    "about",
+    "overview",
+    "program",
+    "student",
+    "career",
+    "download",
+    "policy",
+    "global",
+    "study",
+    "office",
+    "center",
+    "school",
+    "college",
+    "university",
+)
 PROFILE_URL_PERSON_KEYWORDS = (
     "/faculty/",
+    "/faculty-detail/",
     "/teacher/",
     "/teachers/",
     "/people/",
@@ -173,7 +199,17 @@ def is_name_noise(value: str) -> bool:
         return True
     if normalized in NAVIGATION_BLACKLIST:
         return True
-    return any(keyword in normalized for keyword in NAME_NOISE_KEYWORDS)
+    if any(keyword in normalized for keyword in NAME_NOISE_KEYWORDS):
+        return True
+
+    lowered = normalized.lower()
+    if any(keyword in lowered for keyword in ENGLISH_NAME_NOISE_KEYWORDS):
+        return True
+    return False
+
+
+def is_teacher_name(value: str) -> bool:
+    return bool(CHINESE_NAME_PATTERN.fullmatch(value) or ENGLISH_NAME_PATTERN.fullmatch(value))
 
 
 def absolutize_url(raw_url: str, base_url: str) -> Optional[str]:
@@ -282,6 +318,10 @@ def extract_name_from_anchor_text(text: str) -> Optional[str]:
     if CHINESE_NAME_PATTERN.fullmatch(head_token) and not is_name_noise(head_token):
         return head_token
 
+    english_candidate = normalize_spaces(re.sub(r"[（(].*?[）)]", "", text))
+    if ENGLISH_NAME_PATTERN.fullmatch(english_candidate) and not is_name_noise(english_candidate):
+        return english_candidate
+
     return None
 
 
@@ -307,11 +347,13 @@ def clean_teacher_profiles(candidates: Iterable[TeacherProfile], source_url: str
 
     for candidate in candidates:
         normalized_name = re.sub(r"\s+", "", candidate.name)
+        if ENGLISH_NAME_PATTERN.fullmatch(normalize_spaces(candidate.name)):
+            normalized_name = normalize_spaces(candidate.name)
         if not normalized_name:
             continue
         if is_name_noise(normalized_name):
             continue
-        if not CHINESE_NAME_PATTERN.fullmatch(normalized_name):
+        if not is_teacher_name(normalized_name):
             continue
 
         normalized_profile = TeacherProfile(

@@ -1,24 +1,41 @@
+# Local environment
 .env
-output
-.venv
-__pycache__
+.env.*
+.venv/
+venv/
+
+# Python cache and test artifacts
+__pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Runtime files
 *.db
 *.sqlite
 *.log
-*.cache
 *.tmp
 *.bak
 *.swp
-.DS_Store
-.idea
-.vscode
-*.egg-info
-dist
-build
+.cache/
+
+# Build and packaging
+*.egg-info/
 *.egg
+dist/
+build/
 *.tar.gz
 *.whl
-.github
+pip-wheel-metadata/
+
+# Generated output
+output/
+
+# IDE and OS
+.DS_Store
+.idea/
+.vscode/

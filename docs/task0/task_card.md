@@ -1,10 +1,16 @@
 ### 背景
 任务0当前已在清华页面完成基础验证，但上海交通大学院系页面结构更异构：
 - 同一学校内同时存在中文静态页、英文目录页、卡片页与旧版入口。
-- 计算机学院主页 `jiaoshiml.html` 可达但姓名命中不稳定，需保留 CSE 旧页 `People.aspx` 兜底。
+- 计算机学院主页 `jiaoshiml.html` 初始 HTML 为壳页面，教师名录由 AJAX 接口注入；当前已实现“AJAX 优先 + CSE 旧页兜底”。
 - 人工智能学院（`soai.sjtu.edu.cn`）与人工智能研究院（`ai.sjtu.edu.cn`）是不同机构，当前应按“可抓取性优先”先接入前者。
 
 本任务卡按 `docs/task0/step2_rule_driven_strategy.md` 的“自动整页识别优先 + 站点规则兜底”路线，落地 SJTU 教师列表抓取。
+
+### 进展状态（2026-04-18）
+- Step1/Step2/Step3 已完成并通过验收命令。
+- 已实现 `teachers + teacher_profiles` 双轨输出，字段契约稳定。
+- SJTU 计算机学院主入口已支持 AJAX 名录解析，当前样例输出为 293 位教师（含 3 位无主页链接）。
+- 本任务卡转入维护状态；后续优先进入“主页信号 + Scholar 结构化融合推荐”。
 
 ### 最终目标
 在保持 `teachers` 兼容的前提下，面向 SJTU 重点院系稳定输出 `teacher_profiles` 富字段：
