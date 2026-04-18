@@ -127,13 +127,14 @@ conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher �
 - 任务0输出升级为 `teachers + teacher_profiles`：
 	- `teachers` 保持向后兼容（纯姓名列表）
 	- `teacher_profiles` 至少包含 `name/profile_url/source_url`，并尽可能补充 `email/interests/title`
+- 上海交通大学适配优先级调整：先完成“人工智能学院（含双聘/客座补充页）”，再推进其他学院页面。
 - 提取策略升级为“自动整页识别优先、站点规则兜底”，不依赖人工先提供页面结构说明。
 - 完成任务0升级后，再进行任务1预过滤（按主页/邮箱/职称/兴趣等信号）以控制 API 调用次数，避免超过配额。
 
 执行示例：
 
 ```bash
-conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机科学与技术系 --out-dir output/teacher_pool
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool
 ```
 
 输出路径：
@@ -143,7 +144,7 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 可选导出任务1批量输入：
 
 ```bash
-conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 清华大学 --college 计算机科学与技术系 --out-dir output/teacher_pool --export-jsonl output/teacher_pool/all_teachers.jsonl
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --export-jsonl output/teacher_pool/all_teachers.jsonl
 ```
 
 ## 自动化验收命令

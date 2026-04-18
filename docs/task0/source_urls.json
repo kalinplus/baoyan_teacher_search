@@ -20,6 +20,36 @@
     "url": "https://cs.pku.edu.cn/szdw/jyxl/amz/ALL.htm"
   },
   {
+    "school": "上海交通大学",
+    "college": "人工智能学院",
+    "url": "https://soai.sjtu.edu.cn/cn/faculty/zzjs"
+  },
+  {
+    "school": "上海交通大学",
+    "college": "人工智能学院（双聘/客座）",
+    "url": "https://soai.sjtu.edu.cn/cn/teacher/spkz"
+  },
+  {
+    "school": "上海交通大学",
+    "college": "计算机学院（网络空间安全学院、密码学院）",
+    "url": "https://www.cs.sjtu.edu.cn/jiaoshiml.html"
+  },
+  {
+    "school": "上海交通大学",
+    "college": "计算机学院（网络空间安全学院、密码学院，CSE旧页兜底）",
+    "url": "https://cs.sjtu.edu.cn/cse/People.aspx"
+  },
+  {
+    "school": "上海交通大学",
+    "college": "浦江国际学院（原密西根学院）",
+    "url": "https://gc.sjtu.edu.cn/about/faculty-staff/faculty-directory/"
+  },
+  {
+    "school": "上海交通大学",
+    "college": "溥渊未来技术学院",
+    "url": "https://gift.sjtu.edu.cn/faculty"
+  },
+  {
     "school": "清华大学",
     "college": "计算机科学与技术系",
     "url": "https://www.cs.tsinghua.edu.cn/szzk/jzgml.htm"
