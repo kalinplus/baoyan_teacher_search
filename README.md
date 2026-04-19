@@ -60,8 +60,10 @@ conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher �
 - 仅抓取 Google 搜索第 1 页（`start=0`）。
 - 解析网页文本中第一个正则匹配到的 `author_id` 作为最终结果。
 - 候选 `author_id` 最多抓取 1 个（命中首个有效候选后立即停止），不再抓取 10 个。
-- 当前不做候选结果二次校验（如姓名/学校校验后再取下一个）；该能力作为后续增强项。
-- 可选后续 TODO（配合候选校验）：如果校验流程已用完当前搜索得到的全部候选，下一次搜索改用连字符姓名格式（如 `Zhi-Hua Zhou`）。
+- 命中首候选后执行两层校验：
+	- 先做 author_id 反查冲突：若该 author_id 已绑定到其他老师姓名，标记并跳过（`skip_reason=author_id_conflict_existing_teacher`）。
+	- 再做 Scholar 主页姓名校验：若主页姓名与当前检索老师不一致，标记并跳过（`skip_reason=scholar_name_mismatch`）。
+- 仅当两层校验都通过时，才写入缓存并返回结果。
 - 支持 `--log-level` 输出调用链日志，建议排障时使用 `DEBUG`。
 
 ## 最小字段契约

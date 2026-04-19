@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from html import unescape
 import json
 import os
 import re
@@ -23,6 +24,7 @@ UNIVERSITY_CONFIG_PATH = ROOT_DIR / "config" / "universities.json"
 COMPOUND_SURNAMES_CONFIG_PATH = ROOT_DIR / "config" / "compound_surnames.json"
 SCRAPER_ENDPOINT = "https://api.scraperapi.com/"
 AUTHOR_ID_PATTERN = re.compile(r"scholar\.google\.com/citations\?user=([A-Za-z0-9_-]+)")
+SCHOLAR_PROFILE_NAME_PATTERN = re.compile(r"id=[\"']gsc_prf_in[\"'][^>]*>(.*?)<", re.IGNORECASE | re.DOTALL)
 logger = get_logger(__name__)
 
 
@@ -167,6 +169,15 @@ class AuthorIdResolver:
             raise RuntimeError("No author_id found from Google Search results")
 
         author_id = candidate_ids[0]
+        self._validate_candidate_by_cache_conflict(
+            author_id=author_id,
+            teacher_name=teacher_name,
+            cache=cache,
+        )
+        self._validate_candidate_by_scholar_name(
+            author_id=author_id,
+            teacher_name=teacher_name,
+        )
         logger.info(
             "Resolved author_id=%s using first candidate (candidate_count=%s)",
             author_id,
@@ -183,6 +194,115 @@ class AuthorIdResolver:
             "matched_school": school,
             "matched_teacher": teacher_name,
         }
+
+    @staticmethod
+    def _compact_name(value: str) -> str:
+        return re.sub(r"[^0-9a-zA-Z\u4e00-\u9fff]", "", value).casefold()
+
+    def _build_teacher_name_variants(self, teacher_name: str) -> List[str]:
+        variants: List[str] = []
+        compact_original = self._compact_name(teacher_name)
+        if compact_original:
+            variants.append(compact_original)
+
+        if self._contains_cjk(teacher_name):
+            surname, given_name = self._split_chinese_name(teacher_name, self.compound_surnames)
+            surname_pinyin = "".join(self._to_pinyin_syllables(surname))
+            given_name_pinyin = "".join(self._to_pinyin_syllables(given_name))
+            if surname_pinyin and given_name_pinyin:
+                variants.append(self._compact_name(f"{given_name_pinyin} {surname_pinyin}"))
+                variants.append(self._compact_name(f"{surname_pinyin} {given_name_pinyin}"))
+
+        deduped: List[str] = []
+        seen = set()
+        for item in variants:
+            if not item or item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
+
+    @classmethod
+    def _is_same_teacher_name(cls, left: str, right: str) -> bool:
+        left_compact = cls._compact_name(left)
+        right_compact = cls._compact_name(right)
+        if not left_compact or not right_compact:
+            return False
+        return left_compact == right_compact
+
+    @staticmethod
+    def _extract_teacher_from_cache_key(cache_key: str) -> Optional[str]:
+        if "::" not in cache_key:
+            return None
+        _school, teacher = cache_key.split("::", 1)
+        teacher_name = teacher.strip()
+        if not teacher_name:
+            return None
+        return teacher_name
+
+    def _validate_candidate_by_cache_conflict(
+        self,
+        *,
+        author_id: str,
+        teacher_name: str,
+        cache: Dict[str, Any],
+    ) -> None:
+        for cache_key, cached_author_id in cache.items():
+            if cached_author_id != author_id:
+                continue
+            cached_teacher_name = self._extract_teacher_from_cache_key(cache_key)
+            if not cached_teacher_name:
+                continue
+            if self._is_same_teacher_name(cached_teacher_name, teacher_name):
+                continue
+
+            message = (
+                "skip_reason=author_id_conflict_existing_teacher "
+                f"author_id={author_id} cached_teacher={cached_teacher_name} current_teacher={teacher_name}"
+            )
+            logger.warning(message)
+            raise RuntimeError(message)
+
+    def _fetch_scholar_profile_name(self, author_id: str) -> str:
+        scholar_url = f"https://scholar.google.com/citations?user={author_id}&hl=en"
+        response = requests.get(
+            SCRAPER_ENDPOINT,
+            params={
+                "api_key": self.scraperapi_key,
+                "url": scholar_url,
+                "render": "false",
+                "country_code": "us",
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+
+        decoded = unquote(response.text)
+        match = SCHOLAR_PROFILE_NAME_PATTERN.search(decoded)
+        if not match:
+            raise RuntimeError(f"Cannot extract Scholar profile name for author_id={author_id}")
+
+        profile_name = re.sub(r"<[^>]+>", "", unescape(match.group(1))).strip()
+        if not profile_name:
+            raise RuntimeError(f"Scholar profile name is empty for author_id={author_id}")
+        return profile_name
+
+    def _validate_candidate_by_scholar_name(self, *, author_id: str, teacher_name: str) -> None:
+        profile_name = self._fetch_scholar_profile_name(author_id=author_id)
+        profile_name_compact = self._compact_name(profile_name)
+        if not profile_name_compact:
+            raise RuntimeError(f"Scholar profile name is invalid for author_id={author_id}")
+
+        teacher_name_variants = self._build_teacher_name_variants(teacher_name)
+        if any(variant == profile_name_compact for variant in teacher_name_variants):
+            return
+
+        message = (
+            "skip_reason=scholar_name_mismatch "
+            f"author_id={author_id} scholar_name={profile_name} teacher={teacher_name}"
+        )
+        logger.warning(message)
+        raise RuntimeError(message)
 
     @staticmethod
     def _dedupe_terms(values: List[str]) -> List[str]:

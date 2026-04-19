@@ -89,3 +89,4 @@
 - [2026-04-19] [完成 teacher_list_core 第二轮拆分：新增 teacher_list_models/teacher_list_helpers，抽离数据结构与通用解析逻辑，core 收敛为抓取编排层；同步调整 io/prescreen/extractors 导入并通过 teacher_list_collector 回归测试] [下一步继续评估是否将 fetch_html/规则选择进一步拆为 network + pipeline 子模块]
 - [2026-04-19] [将离线预筛打分常量外置到 config/prescreen_scoring.json，并在 teacher_list_prescreen 运行时加载+强校验；新增可配置回归测试] [下一步可将 task1→task2 批量闭环编排串起来，并补齐 author_id 同名消歧]
 - [2026-04-19] [新增 docs/task1/batch_closed_loop_plan.md，固化“批量闭环缺失项→模块拆分→验收标准”的下一步方向] [下一步按文档顺序先实现 author_id 候选消歧，再串联批量编排与最终推荐落盘]
+- [2026-04-19] [按确认口径实现 author_id 首候选两层校验（缓存反查冲突 + Scholar 主页姓名一致性），并补齐 skip reason 与单测覆盖，同时同步 README/progress 文档] [下一步将两层 skip 状态接入批量闭环编排并生成 final_recommendations 的失败明细]

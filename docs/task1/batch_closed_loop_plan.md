@@ -5,7 +5,7 @@
 
 当前缺口是“批量闭环编排”尚未落地：
 - 还没有从 prescreen Top N 自动批量推进到 author_id 和 scholar 的统一入口。
-- 还没有同名老师候选二次校验，首候选策略会引入误匹配风险。
+- 还没有基于“首候选 author_id + 两层跳过校验”的防误匹配逻辑。
 - 还没有最终推荐汇总输出（可解释理由 + 风险提示）。
 
 ## 目标
@@ -27,11 +27,20 @@
 ### 2) 候选消歧模块
 - 模块建议：src/author_disambiguation.py
 - 职责：
-  - 对 author_id 候选做姓名一致性和学校一致性校验。
-  - 仅在校验通过时返回 author_id 并允许写入缓存。
+  - 保留“首个匹配 author_id”策略，不做多候选回退。
+  - 对首个候选执行两层校验：
+    1) author_id 反查冲突校验：
+       使用已存在缓存反查该 author_id；若已绑定到其他老师姓名，则标记当前老师为 skip。
+    2) Scholar 主页姓名校验：
+       若第1层无冲突，则抓取该 author_id 对应 Scholar 主页；若主页姓名与当前检索老师姓名不一致，则标记为 skip。
+  - 仅在两层校验都通过时，才允许将该 author_id 作为有效结果写入缓存并继续后续流程。
 - 说明：
-  - 这是当前闭环正确性的核心缺口。
-  - 不做“静默降级到首候选”的兜底。
+  - 该策略用于处理“部分老师没有 Scholar 主页”导致的误命中问题。
+  - 跳过是显式状态，不做静默兜底。
+
+### 2.1) 跳过原因约定
+- `author_id_conflict_existing_teacher`：该 author_id 在历史缓存中已绑定其他老师。
+- `scholar_name_mismatch`：该 author_id 的 Scholar 主页姓名与当前检索老师不一致。
 
 ### 3) Scholar 批处理执行层
 - 模块建议：src/scholar_batch_runner.py
@@ -75,13 +84,14 @@ recommendations 单项建议字段：
 - risk_flags
 
 ## 实施顺序
-1. 先做 author_id 消歧模块，并替换首候选策略。
+1. 先做 author_id 消歧模块，保留首候选策略并补齐两层跳过校验。
 2. 再做批量编排入口（串起 prescreen -> author_id -> scholar）。
 3. 最后做 recommendation 汇总与输出契约。
 
 ## 验收标准
 - 输入同一份 prescreen.json，多次运行结果稳定。
-- 发生同名冲突时不再默默落入错误老师，必须显式失败或跳过并记录原因。
+- 首候选命中后必须执行两层校验；任一层不通过均显式跳过并记录 skip reason。
+- 两层都通过时才写 author_id 缓存，避免错误缓存污染。
 - 生成 final_recommendations.json 且字段完整。
 - 不新增第三方依赖。
 

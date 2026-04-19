@@ -54,11 +54,12 @@ class TestAuthorIdResolverCacheIsolation(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
             with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
-                result = resolver.resolve(
-                    school="清华大学",
-                    teacher="许华哲",
-                    cache_path=isolated_cache,
-                )
+                with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Huazhe Xu"):
+                    result = resolver.resolve(
+                        school="清华大学",
+                        teacher="许华哲",
+                        cache_path=isolated_cache,
+                    )
 
             self.assertEqual(result["author_id"], "t9HPFawAAAAJ")
             self.assertEqual(result["source"], "google_search")
@@ -171,12 +172,13 @@ class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
             with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
-                with patch("author_id_resolver.logger.warning") as mocked_warning:
-                    resolver.resolve(
-                        school="清华大学",
-                        teacher="huazhe, xu",
-                        cache_path=isolated_cache,
-                    )
+                with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Huazhe Xu"):
+                    with patch("author_id_resolver.logger.warning") as mocked_warning:
+                        resolver.resolve(
+                            school="清华大学",
+                            teacher="huazhe, xu",
+                            cache_path=isolated_cache,
+                        )
 
         mocked_warning.assert_called_once()
         self.assertFalse(isolated_cache.exists())
@@ -187,14 +189,73 @@ class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
             with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
-                with patch("author_id_resolver.logger.warning") as mocked_warning:
+                with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Huazhe Xu"):
+                    with patch("author_id_resolver.logger.warning") as mocked_warning:
+                        resolver.resolve(
+                            school="清华大学",
+                            teacher="许华哲",
+                            cache_path=isolated_cache,
+                        )
+
+        mocked_warning.assert_not_called()
+
+
+class TestAuthorIdResolverTwoLayerSkipLogic(unittest.TestCase):
+    def test_resolve_skips_when_author_id_conflicts_with_existing_teacher(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        with TemporaryDirectory() as tmp_dir:
+            isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
+            isolated_cache.parent.mkdir(parents=True, exist_ok=True)
+            isolated_cache.write_text(
+                json.dumps({"清华大学::唐杰": "AAA111"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            with patch.object(resolver, "search_candidates", return_value=["AAA111"]):
+                with self.assertRaises(RuntimeError) as cm:
                     resolver.resolve(
                         school="清华大学",
-                        teacher="许华哲",
+                        teacher="顾明",
                         cache_path=isolated_cache,
                     )
 
-        mocked_warning.assert_not_called()
+        self.assertIn("skip_reason=author_id_conflict_existing_teacher", str(cm.exception))
+
+    def test_resolve_skips_when_scholar_profile_name_mismatches_teacher(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        with TemporaryDirectory() as tmp_dir:
+            isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
+            with patch.object(resolver, "search_candidates", return_value=["AAA111"]):
+                with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Tang Jie"):
+                    with self.assertRaises(RuntimeError) as cm:
+                        resolver.resolve(
+                            school="清华大学",
+                            teacher="顾明",
+                            cache_path=isolated_cache,
+                        )
+
+        self.assertIn("skip_reason=scholar_name_mismatch", str(cm.exception))
+
+    def test_resolve_writes_cache_only_when_two_layer_checks_pass(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=1)
+
+        with TemporaryDirectory() as tmp_dir:
+            isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
+            with patch.object(resolver, "search_candidates", return_value=["AAA111"]):
+                with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Ming Gu"):
+                    result = resolver.resolve(
+                        school="清华大学",
+                        teacher="顾明",
+                        cache_path=isolated_cache,
+                    )
+
+            cache_obj = load_json(isolated_cache)
+
+        self.assertEqual(result["author_id"], "AAA111")
+        self.assertEqual(result["source"], "google_search")
+        self.assertEqual(cache_obj["清华大学::顾明"], "AAA111")
 
 
 if __name__ == "__main__":
