@@ -155,6 +155,36 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --export-jsonl output/teacher_pool/all_teachers.jsonl
 ```
 
+离线预筛（任务1前置控量）：
+
+```bash
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --prescreen --top-n 20 --budget 20 --keywords 机器学习,计算机视觉
+```
+
+预筛参数说明：
+
+- `--prescreen`：开启离线预筛。
+- `--top-n`：进入下一阶段的目标候选数。
+- `--budget`：实际预算上限（最终候选数为 `min(top_n, budget)`）。
+- `--keywords`：方向关键词（逗号分隔），用于兴趣匹配加分。
+- `--contacted-list`：已联系名单配置路径（默认 `config/contacted_teachers.json`）。
+
+预筛打分规则配置：
+
+- `config/prescreen_scoring.json`：离线预筛的可调参数文件。
+- 可直接调整负向关键词、证据字段、职称关键词、各项加减分权重与 A/B/C 阈值，无需改动代码。
+
+开启预筛后会额外输出：
+
+- `output/teacher_pool/{学校}/{学院}/prescreen.json`
+
+`prescreen.json` 关键字段：
+
+- `top_candidates`：按分数排序且通过预算裁剪后的候选（用于后续 Scholar 抓取）。
+- `candidates`：所有未被硬跳过的评分结果（含 `score/tier/reasons`）。
+- `skipped`：被跳过条目（`skip_reason` 包含 `already_contacted`、`negative_signal_evidence`、`over_budget`）。
+- `stats`：总量、分层分布与各类跳过统计。
+
 ## 自动化验收命令
 
 - Step1

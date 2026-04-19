@@ -197,7 +197,7 @@ def build_summary(result: Dict[str, Any]) -> str:
 
 
 def main() -> int:
-    load_dotenv()
+    load_dotenv(dotenv_path=ROOT_DIR / ".env")
     args = parse_args()
 
     serpapi_key = os.getenv("SERPAPI_KEY", "").strip()

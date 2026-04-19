@@ -1,0 +1,52 @@
+{
+  "negative_signal_keywords": [
+    "暂停招生",
+    "暂不招生",
+    "停止招生",
+    "不招收",
+    "不再招收",
+    "停止招收",
+    "not recruiting",
+    "not accept"
+  ],
+  "evidence_fields": [
+    "evidence_text",
+    "homepage_text",
+    "college_text"
+  ],
+  "title_keywords": {
+    "senior": [
+      "讲席教授",
+      "长聘教授",
+      "教授",
+      "研究员"
+    ],
+    "mid": [
+      "长聘副教授",
+      "副教授",
+      "助理教授",
+      "副研究员",
+      "工程师"
+    ]
+  },
+  "weights": {
+    "profile_url_bonus": 30,
+    "profile_url_person_like_bonus": 8,
+    "missing_profile_url_penalty": 10,
+    "has_email_bonus": 25,
+    "missing_email_penalty": 8,
+    "senior_title_bonus": 10,
+    "mid_title_bonus": 8,
+    "other_title_bonus": 6,
+    "has_interests_bonus": 10,
+    "missing_interests_penalty": 6,
+    "keyword_match_per_hit_bonus": 4,
+    "keyword_match_bonus_cap": 12
+  },
+  "thresholds": {
+    "score_min": 0,
+    "score_max": 100,
+    "tier_a_min": 60,
+    "tier_b_min": 35
+  }
+}

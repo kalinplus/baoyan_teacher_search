@@ -9,7 +9,7 @@ from typing import List
 
 import requests
 
-from teacher_list_core import Rule, TeacherProfile
+from teacher_list_models import Rule, TeacherProfile
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]

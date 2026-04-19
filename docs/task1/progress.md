@@ -116,6 +116,13 @@ Step 3: 结果落盘与回归测试
 - diff 范围控制在 docs/task1/*、docs/task_descs.md、src/teacher_list_core.py、src/teacher_list_collector.py、tests/test_teacher_list_collector.py。
 - 不开启预筛参数时，现有 teachers 与 teacher_profiles 输出保持兼容。
 
+### 本次执行记录（2026-04-19）
+- Step2 已完成：`src/teacher_list_core.py` 新增离线预筛实现（硬过滤 + 评分 + A/B/C 分层 + top_n/budget 裁剪），并提供 `prescreen.json` 落盘能力。
+- Step2 已完成：`src/teacher_list_collector.py` 已接入 `--prescreen`、`--top-n`、`--budget`、`--keywords`、`--contacted-list` 参数。
+- Step3 已完成：`tests/test_teacher_list_collector.py` 新增预筛单测（硬跳过、负向证据、预算裁剪、输入契约 fail fast）。
+- 文档已同步：`README.md` 增加离线预筛命令、参数说明与 `prescreen.json` 字段说明。
+- 验收结果：`conda run -n baoyan python -m unittest tests.test_teacher_list_collector` 通过；基于已存在 `teachers.json` 的离线预筛落盘验证通过。
+
 ### 错误处理约定
 - 如某步失败：先分析原因，给出最小修复方案，确认后再改。
 - 如连续两次失败：暂停并列出候选原因，不继续盲目重试。

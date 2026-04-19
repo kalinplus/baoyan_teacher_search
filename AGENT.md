@@ -38,6 +38,7 @@
 - 阶段任务描述: docs/task_descs.md
 - 阶段2进度: docs/stage2/progress.md
 - Step1契约: docs/task1/step1_contract.md
+- 批量闭环后续计划: docs/task1/batch_closed_loop_plan.md
 - 问题归档: docs/archive/stage2_issues.md
 - 技术路线背景: docs/google_scholar_info.md
 
@@ -84,3 +85,7 @@
 - [2026-04-18] [完成北大重点院系师资页在线校验（状态码/title/样本命中）并新增 docs/task0/pku_teachar_page.md 记录；同步标注 AAIS 当前网络可达性受限] [后续按该记录将北大院系逐步接入 source_urls 与提取规则回归]
 - [2026-04-18] [完成上海交通大学5个关键院系教师页校验并新增 docs/task0/sjtu_teachar_page.md；补充人工智能研究院(ai)与人工智能学院(soai)机构区分与采集建议] [后续可将 SJTU 来源同步到 source_urls.json 并执行规则回归抓取]
 - [2026-04-18] [完成 SJTU 计算机学院主入口 AJAX 抓取修复并同步 README/task_descs/task0/task1 文档口径；将下一优先计划设定为“老师主页信号 + Google Scholar 结构化信息融合，产出可用参考与推荐”] [下一步细化融合特征与排序方案后再进入实现]
+- [2026-04-19] [按任务1进度计划完成离线预筛实现：新增硬过滤（已联系/负向证据）、加权评分、A/B/C 分层、top_n+budget 裁剪，并在 teacher_list_collector 接入 --prescreen 参数与 prescreen.json 落盘，补齐单测和 README 文档] [下一步将 top_candidates 接入任务2 Scholar 抓取链路并补充同名消歧校验]
+- [2026-04-19] [完成 teacher_list_core 第二轮拆分：新增 teacher_list_models/teacher_list_helpers，抽离数据结构与通用解析逻辑，core 收敛为抓取编排层；同步调整 io/prescreen/extractors 导入并通过 teacher_list_collector 回归测试] [下一步继续评估是否将 fetch_html/规则选择进一步拆为 network + pipeline 子模块]
+- [2026-04-19] [将离线预筛打分常量外置到 config/prescreen_scoring.json，并在 teacher_list_prescreen 运行时加载+强校验；新增可配置回归测试] [下一步可将 task1→task2 批量闭环编排串起来，并补齐 author_id 同名消歧]
+- [2026-04-19] [新增 docs/task1/batch_closed_loop_plan.md，固化“批量闭环缺失项→模块拆分→验收标准”的下一步方向] [下一步按文档顺序先实现 author_id 候选消歧，再串联批量编排与最终推荐落盘]

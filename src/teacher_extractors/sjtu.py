@@ -6,7 +6,7 @@ from typing import List
 
 import requests
 
-from teacher_list_core import Rule, TeacherProfile
+from teacher_list_models import Rule, TeacherProfile
 
 
 CHINESE_NAME_PATTERN = re.compile(r"^[\u4e00-\u9fff]{2,4}$")

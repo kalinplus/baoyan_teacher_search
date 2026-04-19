@@ -320,7 +320,7 @@ class AuthorIdResolver:
 
 
 def main() -> int:
-    load_dotenv()
+    load_dotenv(dotenv_path=ROOT_DIR / ".env")
     args = parse_args()
     configure_logging(args.log_level)
 

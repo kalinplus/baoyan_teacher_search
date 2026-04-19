@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 
-from teacher_list_core import Rule
+from teacher_list_models import Rule
 from . import sjtu
 from . import thu
 

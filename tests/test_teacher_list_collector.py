@@ -31,7 +31,15 @@ from teacher_extractors.sjtu import (
     extract_sjtu_soai_zzjs_profiles,
 )
 from teacher_list_core import clean_teacher_names, fetch_html
-from teacher_list_core import Rule, SourceRecord, TeacherProfile, collect_teachers, export_jsonl, extract_name_from_anchor_text
+from teacher_list_core import (
+    Rule,
+    SourceRecord,
+    TeacherProfile,
+    collect_teachers,
+    extract_name_from_anchor_text,
+)
+from teacher_list_io import export_jsonl
+from teacher_list_prescreen import parse_keyword_csv, run_offline_prescreen
 
 
 class _FakeResponse:
@@ -464,6 +472,185 @@ class TestTeacherListCollectorRules(unittest.TestCase):
 
     def info(self, *_args, **_kwargs) -> None:
         return None
+
+
+class TestTeacherOfflinePrescreen(unittest.TestCase):
+    def test_parse_keyword_csv_dedup_and_strip(self) -> None:
+        keywords = parse_keyword_csv(" 机器学习,计算机视觉,机器学习 ,, ")
+
+        self.assertEqual(keywords, ["机器学习", "计算机视觉"])
+
+    def test_run_offline_prescreen_skips_contacted_and_negative_evidence(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "张三",
+                    "profile_url": "https://example.com/faculty/zhangsan",
+                    "email": "zhangsan@tsinghua.edu.cn",
+                    "interests": ["机器学习"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                },
+                {
+                    "name": "李四",
+                    "profile_url": "https://example.com/faculty/lisi",
+                    "email": "lisi@tsinghua.edu.cn",
+                    "interests": ["计算机视觉", "机器学习"],
+                    "title": "副教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                },
+                {
+                    "name": "王五",
+                    "profile_url": "https://example.com/faculty/wangwu",
+                    "email": None,
+                    "interests": [],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                    "homepage_text": "2026年暂停招生，请勿来信",
+                },
+            ],
+        }
+
+        result = run_offline_prescreen(
+            payload,
+            top_n=5,
+            budget=5,
+            keywords=["机器学习"],
+            contacted_teachers={"清华大学": {"张三"}},
+        )
+
+        self.assertEqual([item["name"] for item in result["top_candidates"]], ["李四"])
+        skip_map = {item["name"]: item["skip_reason"] for item in result["skipped"]}
+        self.assertEqual(skip_map["张三"], "already_contacted")
+        self.assertEqual(skip_map["王五"], "negative_signal_evidence")
+
+    def test_run_offline_prescreen_marks_over_budget(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "甲",
+                    "profile_url": "https://example.com/faculty/a",
+                    "email": "a@tsinghua.edu.cn",
+                    "interests": ["机器学习"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                },
+                {
+                    "name": "乙",
+                    "profile_url": "https://example.com/faculty/b",
+                    "email": "b@tsinghua.edu.cn",
+                    "interests": ["计算机视觉"],
+                    "title": "副教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                },
+                {
+                    "name": "丙",
+                    "profile_url": None,
+                    "email": None,
+                    "interests": [],
+                    "title": None,
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                },
+            ],
+        }
+
+        result = run_offline_prescreen(
+            payload,
+            top_n=2,
+            budget=1,
+            keywords=["机器学习"],
+            contacted_teachers={},
+        )
+
+        self.assertEqual(len(result["top_candidates"]), 1)
+        skipped_names = {item["name"] for item in result["skipped"] if item["skip_reason"] == "over_budget"}
+        self.assertTrue({"乙", "丙"}.issubset(skipped_names))
+        self.assertEqual(result["stats"]["over_budget_skipped"], 2)
+
+    def test_run_offline_prescreen_fail_fast_on_invalid_profile(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [{"profile_url": "https://example.com/faculty/a"}],
+        }
+
+        with self.assertRaises(ValueError):
+            run_offline_prescreen(
+                payload,
+                top_n=10,
+                budget=10,
+                keywords=[],
+                contacted_teachers={},
+            )
+
+    def test_run_offline_prescreen_uses_external_scoring_config(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "甲",
+                    "profile_url": "https://example.com/faculty/a",
+                    "email": "a@tsinghua.edu.cn",
+                    "interests": ["机器学习"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                }
+            ],
+        }
+
+        custom_config = {
+            "negative_signal_keywords": ["暂停招生"],
+            "evidence_fields": ["homepage_text"],
+            "title_keywords": {
+                "senior": ["教授"],
+                "mid": ["副教授"],
+            },
+            "weights": {
+                "profile_url_bonus": 1,
+                "profile_url_person_like_bonus": 0,
+                "missing_profile_url_penalty": 0,
+                "has_email_bonus": 1,
+                "missing_email_penalty": 0,
+                "senior_title_bonus": 1,
+                "mid_title_bonus": 0,
+                "other_title_bonus": 0,
+                "has_interests_bonus": 1,
+                "missing_interests_penalty": 0,
+                "keyword_match_per_hit_bonus": 1,
+                "keyword_match_bonus_cap": 1,
+            },
+            "thresholds": {
+                "score_min": 0,
+                "score_max": 100,
+                "tier_a_min": 90,
+                "tier_b_min": 50,
+            },
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "prescreen_scoring.json"
+            config_path.write_text(json.dumps(custom_config, ensure_ascii=False), encoding="utf-8")
+
+            result = run_offline_prescreen(
+                payload,
+                top_n=5,
+                budget=5,
+                keywords=["机器学习"],
+                contacted_teachers={},
+                scoring_config_path=config_path,
+            )
+
+        self.assertEqual(result["top_candidates"][0]["score"], 5)
+        self.assertEqual(result["top_candidates"][0]["tier"], "C")
 
 
 if __name__ == "__main__":
