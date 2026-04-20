@@ -136,10 +136,9 @@ conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher �
 
 下一步优先计划（已设定，具体实现后续讨论）：
 
-- 以任务0产出的 `teacher_profiles` 为输入，构建“老师主页可达性 + 招生/方向/职称信号”的预筛特征表。
-- 仅对预筛后的候选执行 Google Scholar 结构化抓取，形成低成本控量流程。
-- 在同一老师维度融合“主页信号 + Scholar 指标”，输出真实可用的信息参考卡与推荐理由。
-- 推荐结果保留可解释依据（命中的关键词、证据来源 URL、Scholar 指标摘要），便于人工复核与联系决策。
+- 顺序一：先打通单老师闭环（已实现两层 skip 校验，下一步补齐单老师 recommendation 输出与失败明细）。
+- 顺序二：单老师闭环稳定后，再做批量编排，读取 prescreen top_candidates 执行批量抓取与汇总。
+- 顺序三：增强推荐汇总规则，细化 recommendation_reason 与 risk_flags。
 
 执行示例：
 
@@ -186,6 +185,27 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 - `candidates`：所有未被硬跳过的评分结果（含 `score/tier/reasons`）。
 - `skipped`：被跳过条目（`skip_reason` 包含 `already_contacted`、`negative_signal_evidence`、`over_budget`）。
 - `stats`：总量、分层分布与各类跳过统计。
+
+任务1批量闭环（prescreen Top N -> author_id -> scholar -> recommendation）：
+
+```bash
+conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --college 计算机科学与技术系 --pool-dir output/teacher_pool --out-dir output
+```
+
+批量闭环输入：
+
+- `output/teacher_pool/{学校}/{学院}/teachers.json`
+- `output/teacher_pool/{学校}/{学院}/prescreen.json`
+
+批量闭环输出：
+
+- `output/{学校}/{学院}/final_recommendations.json`
+
+`final_recommendations.json` 关键字段：
+
+- 顶层字段：`school`、`college`、`generated_at`、`total_candidates`、`resolved_candidates`、`failed_candidates`、`failed_candidate_details`、`recommendations`
+- `failed_candidate_details`：失败老师维度明细，当前包含消歧阶段 skip 原因（`author_id_conflict_existing_teacher`、`scholar_name_mismatch`）
+- `recommendations` 单项字段：`teacher`、`prescreen_score`、`prescreen_tier`、`prescreen_reasons`、`author_id`、`author_id_source`、`scholar_metrics`、`recommendation_reason`、`risk_flags`
 
 ## 自动化验收命令
 

@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import requests
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -49,6 +51,29 @@ class TestScholarClientPublicationsTruncated(unittest.TestCase):
             profile = client.query_structured_info(author_id="abc")
 
         self.assertFalse(profile["publications_truncated"])
+
+    def test_query_structured_info_retries_three_attempts_with_increasing_timeout(self) -> None:
+        payload = {
+            "author": {"name": "A"},
+            "articles": [],
+            "serpapi_pagination": {},
+        }
+        client = ScholarAuthorClient(serpapi_key="test-key", timeout=5)
+
+        with patch(
+            "scholar_client.requests.get",
+            side_effect=[
+                requests.exceptions.Timeout("t1"),
+                requests.exceptions.Timeout("t2"),
+                _FakeResponse(payload),
+            ],
+        ) as mocked_get:
+            profile = client.query_structured_info(author_id="abc")
+
+        self.assertEqual(profile["name"], "A")
+        self.assertEqual(mocked_get.call_count, 3)
+        called_timeouts = [call.kwargs["timeout"] for call in mocked_get.call_args_list]
+        self.assertEqual(called_timeouts, [5, 35, 65])
 
 
 if __name__ == "__main__":

@@ -84,17 +84,27 @@ recommendations 单项建议字段：
 - risk_flags
 
 ## 实施顺序
-1. 先做 author_id 消歧模块，保留首候选策略并补齐两层跳过校验。
-2. 再做批量编排入口（串起 prescreen -> author_id -> scholar）。
-3. 最后做 recommendation 汇总与输出契约。
+1. 先打通单老师闭环（优先做 2/3/4）：
+  - 保留首候选策略，执行两层跳过校验（已在 author_id_resolver 落地）。
+  - 在单老师入口补齐 recommendation 输出与失败明细（含 skip reason）。
+  - 目标是先验证“单老师可稳定跑通”。
+2. 单老师闭环通过后，再做批量编排入口（实现 1）：
+  - 读取 prescreen top_candidates。
+  - 批量调用单老师闭环能力并汇总成功/失败。
+3. 最后做 recommendation 汇总增强：
+  - 完整落盘 final_recommendations.json 契约。
+  - 细化 recommendation_reason 与 risk_flags 规则。
 
 ## 验收标准
 - 输入同一份 prescreen.json，多次运行结果稳定。
 - 首候选命中后必须执行两层校验；任一层不通过均显式跳过并记录 skip reason。
 - 两层都通过时才写 author_id 缓存，避免错误缓存污染。
+- 先满足单老师闭环可用（成功路径 + skip 路径都可复现），再进入批量编排开发。
 - 生成 final_recommendations.json 且字段完整。
 - 不新增第三方依赖。
 
 ## 验收命令（草案）
+- 单老师闭环（先验收）：
+- conda run -n baoyan python src/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 - conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --college 计算机科学与技术系 --pool-dir output/teacher_pool
 - conda run -n baoyan python -m unittest tests.test_author_id_resolver tests.test_scholar_client tests.test_teacher_list_collector

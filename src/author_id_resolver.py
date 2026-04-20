@@ -112,8 +112,36 @@ class AuthorIdResolver:
             raise RuntimeError("Missing environment variable: SCRAPERAPI_KEY")
         self.scraperapi_key = scraperapi_key
         self.timeout = timeout
+        self.max_attempts = 3
+        self.retry_timeout_step = 30
         self.compound_surnames = load_compound_surnames(compound_surnames_path)
         logger.debug("AuthorIdResolver initialized with timeout=%s", timeout)
+
+    def _request_with_retry(self, *, url: str, params: Dict[str, str]) -> requests.Response:
+        for attempt in range(1, self.max_attempts + 1):
+            attempt_timeout = self.timeout + (attempt - 1) * self.retry_timeout_step
+            try:
+                response = requests.get(
+                    SCRAPER_ENDPOINT,
+                    params={
+                        "api_key": self.scraperapi_key,
+                        "url": url,
+                        **params,
+                    },
+                    timeout=attempt_timeout,
+                )
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException:
+                if attempt >= self.max_attempts:
+                    raise
+                logger.warning(
+                    "Request failed, retrying attempt=%s/%s timeout=%ss url=%s",
+                    attempt,
+                    self.max_attempts,
+                    attempt_timeout,
+                    url,
+                )
 
     def resolve(
         self,
@@ -265,17 +293,13 @@ class AuthorIdResolver:
 
     def _fetch_scholar_profile_name(self, author_id: str) -> str:
         scholar_url = f"https://scholar.google.com/citations?user={author_id}&hl=en"
-        response = requests.get(
-            SCRAPER_ENDPOINT,
+        response = self._request_with_retry(
+            url=scholar_url,
             params={
-                "api_key": self.scraperapi_key,
-                "url": scholar_url,
                 "render": "false",
                 "country_code": "us",
             },
-            timeout=self.timeout,
         )
-        response.raise_for_status()
 
         decoded = unquote(response.text)
         match = SCHOLAR_PROFILE_NAME_PATTERN.search(decoded)
@@ -404,17 +428,13 @@ class AuthorIdResolver:
 
         google_url = f"https://www.google.com/search?q={quote(query)}&hl=en&num=10&start=0"
         logger.debug("Requesting search page start=0 with URL=%s", google_url)
-        response = requests.get(
-            SCRAPER_ENDPOINT,
+        response = self._request_with_retry(
+            url=google_url,
             params={
-                "api_key": self.scraperapi_key,
-                "url": google_url,
                 "render": "false",
                 "country_code": "us",
             },
-            timeout=self.timeout,
         )
-        response.raise_for_status()
         logger.debug("Search request succeeded, response_length=%s", len(response.text))
 
         decoded = unquote(response.text)

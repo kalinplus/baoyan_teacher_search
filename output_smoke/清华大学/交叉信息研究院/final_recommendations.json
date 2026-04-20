@@ -1,0 +1,48 @@
+{
+  "school": "清华大学",
+  "college": "交叉信息研究院",
+  "generated_at": "2026-04-19T20:07:27",
+  "total_candidates": 1,
+  "resolved_candidates": 1,
+  "failed_candidates": 0,
+  "failed_candidate_details": [],
+  "recommendations": [
+    {
+      "teacher": "段路明",
+      "prescreen_score": 46,
+      "prescreen_tier": "B",
+      "prescreen_reasons": [
+        "has_profile_url",
+        "missing_email",
+        "senior_title",
+        "has_interests",
+        "keyword_match:人工智能"
+      ],
+      "author_id": "ULkJQpkAAAAJ",
+      "author_id_source": "author_id_cache",
+      "scholar_metrics": {
+        "name": "Luming Duan",
+        "affiliations": "C.C. Yao Professor, Tsinghua University",
+        "email": "Verified email at tsinghua.edu.cn",
+        "interests": [
+          "Quantum Computation and Information"
+        ],
+        "citations_all": 48020,
+        "citations_last_1y": 1300,
+        "citations_last_3y": 8969,
+        "citations_last_5y": 14961,
+        "publications_total": 100,
+        "publications_last_1y": 7,
+        "publications_last_3y": 49,
+        "publications_last_5y": 84,
+        "publications_truncated": true,
+        "h_index_all": 92,
+        "i10_index_all": 251
+      },
+      "recommendation_reason": "prescreen_tier=B; prescreen_score=46; citations_all=48020; publications_last_3y=49",
+      "risk_flags": [
+        "publications_truncated"
+      ]
+    }
+  ]
+}

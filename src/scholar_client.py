@@ -31,22 +31,34 @@ class ScholarAuthorClient:
         self.serpapi_key = serpapi_key
         self.timeout = timeout
         self.endpoint = endpoint
+        self.max_attempts = 3
+        self.retry_timeout_step = 120
+
+    def _request_with_retry(self, *, author_id: str) -> requests.Response:
+        for attempt in range(1, self.max_attempts + 1):
+            attempt_timeout = self.timeout + (attempt - 1) * self.retry_timeout_step
+            try:
+                response = requests.get(
+                    self.endpoint,
+                    params={
+                        "api_key": self.serpapi_key,
+                        "engine": "google_scholar_author",
+                        "author_id": author_id,
+                        "hl": "en",
+                        "sort": "pubdate",
+                        "num": "100",
+                    },
+                    timeout=attempt_timeout,
+                )
+                response.raise_for_status()
+                return response
+            except requests.exceptions.RequestException:
+                if attempt >= self.max_attempts:
+                    raise
 
     def query_structured_info(self, author_id: str) -> Dict[str, Any]:
         """Main method: query structured metrics by explicit Google Scholar author_id."""
-        response = requests.get(
-            self.endpoint,
-            params={
-                "api_key": self.serpapi_key,
-                "engine": "google_scholar_author",
-                "author_id": author_id,
-                "hl": "en",
-                "sort": "pubdate",
-                "num": "100",
-            },
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
+        response = self._request_with_retry(author_id=author_id)
         payload = response.json()
 
         if payload.get("error"):

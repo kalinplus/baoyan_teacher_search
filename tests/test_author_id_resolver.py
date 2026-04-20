@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from urllib.parse import parse_qs, unquote, urlparse
 
+import requests
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = PROJECT_ROOT / "src"
@@ -163,6 +165,39 @@ class TestAuthorIdResolverSearchQueryStrategy(unittest.TestCase):
         self.assertIn("THU", decoded_query)
         self.assertIn("huazhe, xu", decoded_query)
         self.assertIn("start=0", called_url)
+
+
+class TestAuthorIdResolverRetry(unittest.TestCase):
+    def test_search_candidates_retries_three_attempts_with_increasing_timeout(self) -> None:
+        resolver = AuthorIdResolver(scraperapi_key="test-key", timeout=5)
+
+        class FakeResponse:
+            def __init__(self, text: str):
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+        fake_body = "https://scholar.google.com/citations?user=t9HPFawAAAAJ&hl=en"
+
+        with patch(
+            "author_id_resolver.requests.get",
+            side_effect=[
+                requests.exceptions.Timeout("t1"),
+                requests.exceptions.Timeout("t2"),
+                FakeResponse(fake_body),
+            ],
+        ) as mocked_get:
+            author_ids = resolver.search_candidates(
+                teacher="huazhe, xu",
+                school="清华大学",
+                school_aliases=["THU"],
+            )
+
+        self.assertEqual(author_ids, ["t9HPFawAAAAJ"])
+        self.assertEqual(mocked_get.call_count, 3)
+        called_timeouts = [call.kwargs["timeout"] for call in mocked_get.call_args_list]
+        self.assertEqual(called_timeouts, [5, 35, 65])
 
 
 class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):

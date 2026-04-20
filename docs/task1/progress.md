@@ -57,6 +57,18 @@
 - 清华大学::唐杰 仍存在跨学校同名误匹配风险；在融合阶段需要补充学校/姓名一致性校验策略。
 - 当前版本按“首个匹配”策略运行；两层校验不通过时标记 skip，不继续尝试下一个候选。
 
+下一步执行顺序（已确认）：
+- 第一步：先完成单老师闭环（2/3/4），保证单老师在成功/skip 两条路径都可稳定输出。
+- 第二步：在单老师闭环稳定后，再实现批量编排入口（1），串联 prescreen top_candidates。
+
+## 批量闭环落地记录（2026-04-19）
+
+- 已新增 `src/batch_closed_loop.py`，支持从 `teachers.json + prescreen.json` 读取 top_candidates 后批量执行闭环，并落盘 `final_recommendations.json`。
+- 已新增 `src/author_disambiguation.py`，将 author_id 首候选两层校验结果标准化为 `resolved/skip` 状态，skip 原因显式输出。
+- 已新增 `src/scholar_batch_runner.py`，对消歧通过候选批量调用 `ScholarAuthorClient` 并返回 teacher 维度结构化结果。
+- 已新增 `src/recommendation_assembler.py`，聚合 prescreen + scholar 指标，生成推荐理由与风险标记。
+- 已新增 `tests/test_batch_closed_loop.py`，覆盖成功链路、skip 链路、fail-fast 异常上抛。
+
 ## Step3 执行记录
 - 集成完成: src/scholar_client.py 已接入 AuthorIdResolver（author_id 可选输入，缺省自动发现）。
 - 文档同步: README.md、docs/task_descs.md、AGENT.md 已完成行为与命令对齐。
