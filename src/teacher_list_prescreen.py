@@ -249,7 +249,16 @@ def _score_teacher_profile(
 
     matched_keywords: List[str] = []
     if keywords:
-        search_text = " ".join([title, *interests]).lower()
+        search_parts = [title, *interests]
+        homepage = profile.get("homepage")
+        if isinstance(homepage, dict):
+            for field in ("research_fields", "bio", "representative_works", "conferences"):
+                val = homepage.get(field)
+                if isinstance(val, list):
+                    search_parts.extend(val)
+                elif isinstance(val, str) and val:
+                    search_parts.append(val)
+        search_text = " ".join(search_parts).lower()
         for keyword in keywords:
             if keyword.lower() in search_text:
                 matched_keywords.append(keyword)

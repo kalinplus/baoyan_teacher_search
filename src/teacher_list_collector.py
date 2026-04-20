@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=int, default=30, help="HTTP timeout in seconds")
     parser.add_argument("--export-jsonl", default="", help="Optional export path for all teachers jsonl")
     parser.add_argument("--prescreen", action="store_true", help="Run offline prescreen and output prescreen.json")
+    parser.add_argument("--prescreen-dir", default="", help="Read teachers.json from this directory for prescreen (skip collection)")
     parser.add_argument("--top-n", type=int, default=20, help="Top N candidates selected for next stage")
     parser.add_argument("--budget", type=int, default=20, help="Max candidate budget for next stage")
     parser.add_argument("--keywords", default="", help="Comma-separated keyword hints for interest matching")
@@ -47,9 +48,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _prescreen_from_dir(base_dir: Path, args: argparse.Namespace) -> int:
+    contacted_teachers = load_contacted_teachers(Path(args.contacted_list))
+    keywords = parse_keyword_csv(args.keywords)
+
+    for teachers_json in sorted(base_dir.rglob("teachers.json")):
+        payload = json.loads(teachers_json.read_text(encoding="utf-8"))
+        prescreen_payload = run_offline_prescreen(
+            payload,
+            top_n=args.top_n,
+            budget=args.budget,
+            keywords=keywords,
+            contacted_teachers=contacted_teachers,
+        )
+        prescreen_saved = save_prescreen_result(base_dir, prescreen_payload)
+        logger.info("Prescreen %s: %d candidates, saved %s", teachers_json.parent.name, len(prescreen_payload["top_candidates"]), prescreen_saved)
+        print(f"Saved: {prescreen_saved}")
+
+    return 0
+
+
 def main() -> int:
     args = parse_args()
     configure_logging(args.log_level)
+
+    if args.prescreen_dir:
+        return _prescreen_from_dir(Path(args.prescreen_dir), args)
 
     rules = get_rules()
     records = select_records(args)

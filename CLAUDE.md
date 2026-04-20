@@ -1,4 +1,4 @@
-# AGENT.md
+# CLAUDE.md
 
 本文件是本仓库的统一代理入口说明（类似 CLAUDE.md）。
 
@@ -36,7 +36,7 @@
 ### Docs
 - 项目运行与字段契约: README.md
 - 阶段任务描述: docs/task_descs.md
-- 阶段2进度: docs/task_descs.md
+- 阶段2进度: docs/stage2/progress.md
 - Step1契约: docs/task1/step1_contract.md
 - 批量闭环后续计划: docs/task1/batch_closed_loop_plan.md
 - 问题归档: docs/archive/stage2_issues.md

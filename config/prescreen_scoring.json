@@ -11,8 +11,21 @@
   ],
   "evidence_fields": [
     "evidence_text",
-    "homepage_text",
-    "college_text"
+    "homepage_text"
+  ],
+  "interest_target_keywords": [
+    "自然语言处理", "NLP", "大语言模型", "LLM", "大模型",
+    "计算机视觉", "图像", "视频", "视觉",
+    "机器学习", "深度学习", "强化学习",
+    "数据挖掘", "知识图谱",
+    "多模态", "生成式",
+    "信息检索", "推荐系统",
+    "人工智能", "AI", "智能",
+    "具身智能", "机器人", "机器人学",
+    "语音", "语音识别", "语音合成",
+    "安全", "隐私", "对抗",
+    "算法", "优化", "博弈论",
+    "操作系统", "分布式系统", "系统软件"
   ],
   "title_keywords": {
     "senior": [
@@ -41,7 +54,7 @@
     "has_interests_bonus": 10,
     "missing_interests_penalty": 6,
     "keyword_match_per_hit_bonus": 4,
-    "keyword_match_bonus_cap": 12
+    "keyword_match_bonus_cap": 15
   },
   "thresholds": {
     "score_min": 0,

@@ -231,7 +231,7 @@ conda run -n baoyan python -c "import json,pathlib;p=pathlib.Path('output/清华
 ## 阶段文档索引
 
 - 任务描述: docs/task_descs.md
-- 阶段2进度: docs/stage2/progress.md
+- 阶段2进度: docs/task_descs.md
 - Step1契约: docs/task1/step1_contract.md
 - 问题归档: docs/archive/stage2_issues.md
 
