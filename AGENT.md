@@ -101,3 +101,4 @@
 - [2026-04-20] [增强 scraper：full_text 存储、extract_title 提取职称并回填、EMAIL_PATTERN 放宽域名限制；北大 AI 114人全成功（106人补全email/112人补全title），CS 119/120成功] [下一步可优化 nav 噪音过滤和 email 提取率]
 - [2026-04-20] [优化详情页文本清洗：html_to_text 先删 script/style 块；clean_text 增加去重策略（出现≥2次的行视为 nav 去掉）+ nav 关键词扩展 + 短行块过滤 + homepage 跨行提取 + 去掉域名白名单限制] [已同步更新 architecture.md 任务0.5流程、数据契约、设计决策、目录结构]
 - [2026-04-20] [对全部 16 个学院 1480 位教师完成详情页抓取：homepage 1329(89.8%), email 975(65.9%), title 1033(69.8%), 0 失败；上交 email 补全率最高(99%), 清华 CS 74%, 北大 CS 仅 1%(图片邮箱)] [下一步可对全部数据跑 --prescreen-dir 并分析跨校分数分布]
+基于规则和启发式的排序还是不太可行。还得接 LLM，宁缺毋滥

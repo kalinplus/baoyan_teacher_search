@@ -159,7 +159,7 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 离线预筛（任务1前置控量）：
 
 ```bash
-conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --prescreen --top-n 20 --budget 20 --keywords 机器学习,计算机视觉
+conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --prescreen --top-n 20 --budget 20 --keywords 机器学习,计算机视觉 --negative-keywords 艺术,设计,传媒
 ```
 
 预筛参数说明：
@@ -168,12 +168,15 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 - `--top-n`：进入下一阶段的目标候选数。
 - `--budget`：实际预算上限（最终候选数为 `min(top_n, budget)`）。
 - `--keywords`：方向关键词（逗号分隔），用于兴趣匹配加分。
+- `--negative-keywords`：负向兴趣关键词（逗号分隔），命中后按配置扣分。
 - `--contacted-list`：已联系名单配置路径（默认 `config/contacted_teachers.json`）。
 
 预筛打分规则配置：
 
 - `config/prescreen_scoring.json`：离线预筛的可调参数文件。
-- 可直接调整负向关键词、证据字段、职称关键词、各项加减分权重与 A/B/C 阈值，无需改动代码。
+- 可直接调整负向信号关键词、负向兴趣关键词、证据字段、职称关键词、各项加减分权重与 A/B/C 阈值，无需改动代码。
+- 关键词匹配采用整词匹配：纯 ASCII 关键词使用 `\b` 词边界，中文/混合关键词使用前后非字母数字边界，避免子串误命中（如 `"AI"` 不会匹配 `"FAIL"`）。
+- 若兴趣字段非空，但既未命中任何正向关键词，也未命中任何负向关键词，则施加轻微中性惩罚（默认 `-1`），防止方向过多、撞库式 broad match 获得虚高分数。
 
 开启预筛后会额外输出：
 

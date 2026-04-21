@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-n", type=int, default=20, help="Top N candidates selected for next stage")
     parser.add_argument("--budget", type=int, default=20, help="Max candidate budget for next stage")
     parser.add_argument("--keywords", default="", help="Comma-separated keyword hints for interest matching")
+    parser.add_argument("--negative-keywords", default="", help="Comma-separated negative interest keywords for penalty")
     parser.add_argument(
         "--contacted-list",
         default=str(DEFAULT_CONTACTED_PATH),
@@ -51,6 +52,7 @@ def parse_args() -> argparse.Namespace:
 def _prescreen_from_dir(base_dir: Path, args: argparse.Namespace) -> int:
     contacted_teachers = load_contacted_teachers(Path(args.contacted_list))
     keywords = parse_keyword_csv(args.keywords)
+    negative_keywords = parse_keyword_csv(args.negative_keywords)
 
     for teachers_json in sorted(base_dir.rglob("teachers.json")):
         payload = json.loads(teachers_json.read_text(encoding="utf-8"))
@@ -59,6 +61,7 @@ def _prescreen_from_dir(base_dir: Path, args: argparse.Namespace) -> int:
             top_n=args.top_n,
             budget=args.budget,
             keywords=keywords,
+            negative_keywords=negative_keywords,
             contacted_teachers=contacted_teachers,
         )
         prescreen_saved = save_prescreen_result(base_dir, prescreen_payload)
@@ -79,6 +82,7 @@ def main() -> int:
     records = select_records(args)
     out_dir = Path(args.out_dir)
     keywords = parse_keyword_csv(args.keywords)
+    negative_keywords = parse_keyword_csv(args.negative_keywords)
     contacted_teachers = load_contacted_teachers(Path(args.contacted_list)) if args.prescreen else {}
 
     results = []
@@ -97,6 +101,7 @@ def main() -> int:
                     top_n=args.top_n,
                     budget=args.budget,
                     keywords=keywords,
+                    negative_keywords=negative_keywords,
                     contacted_teachers=contacted_teachers,
                 )
                 prescreen_saved = save_prescreen_result(out_dir, prescreen_payload)

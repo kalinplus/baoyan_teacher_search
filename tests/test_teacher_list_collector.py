@@ -609,6 +609,7 @@ class TestTeacherOfflinePrescreen(unittest.TestCase):
 
         custom_config = {
             "negative_signal_keywords": ["暂停招生"],
+            "negative_interest_keywords": ["艺术"],
             "evidence_fields": ["homepage_text"],
             "title_keywords": {
                 "senior": ["教授"],
@@ -627,6 +628,9 @@ class TestTeacherOfflinePrescreen(unittest.TestCase):
                 "missing_interests_penalty": 0,
                 "keyword_match_per_hit_bonus": 1,
                 "keyword_match_bonus_cap": 1,
+                "negative_keyword_match_per_hit_penalty": 2,
+                "negative_keyword_match_penalty_cap": 4,
+                "neutral_penalty": 1,
             },
             "thresholds": {
                 "score_min": 0,
@@ -651,6 +655,99 @@ class TestTeacherOfflinePrescreen(unittest.TestCase):
 
         self.assertEqual(result["top_candidates"][0]["score"], 5)
         self.assertEqual(result["top_candidates"][0]["tier"], "C")
+
+    def test_keyword_whole_word_match_avoids_substring(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "甲",
+                    "profile_url": "https://example.com/faculty/a",
+                    "email": "a@tsinghua.edu.cn",
+                    "interests": ["EMAIL security", "FAIL analysis"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                }
+            ],
+        }
+
+        result = run_offline_prescreen(
+            payload,
+            top_n=5,
+            budget=5,
+            keywords=["AI"],
+            contacted_teachers={},
+        )
+
+        self.assertEqual(result["top_candidates"][0]["matched_keywords"], [])
+        self.assertNotIn("keyword_match:AI", result["top_candidates"][0]["reasons"])
+
+    def test_negative_keyword_penalty(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "甲",
+                    "profile_url": "https://example.com/faculty/a",
+                    "email": "a@tsinghua.edu.cn",
+                    "interests": ["艺术设计", "机器学习"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                }
+            ],
+        }
+
+        result = run_offline_prescreen(
+            payload,
+            top_n=5,
+            budget=5,
+            keywords=["机器学习"],
+            negative_keywords=["艺术"],
+            contacted_teachers={},
+        )
+
+        candidate = result["top_candidates"][0]
+        self.assertIn("艺术", candidate["matched_negative_keywords"])
+        self.assertIn("negative_keyword_match:艺术", candidate["reasons"])
+        # profile_url 30 + person_like 8 + email 25 + senior_title 10 + has_interests 10
+        # + keyword_match(机器学习) 4 - negative_keyword_match(艺术) 5 = 82
+        self.assertEqual(candidate["score"], 82)
+
+    def test_neutral_penalty_when_no_match(self) -> None:
+        payload = {
+            "school": "清华大学",
+            "college": "软件学院",
+            "url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+            "teacher_profiles": [
+                {
+                    "name": "甲",
+                    "profile_url": "https://example.com/faculty/a",
+                    "email": "a@tsinghua.edu.cn",
+                    "interests": ["数据库", "网络安全"],
+                    "title": "教授",
+                    "source_url": "https://www.thss.tsinghua.edu.cn/szdw/jsml.htm",
+                }
+            ],
+        }
+
+        result = run_offline_prescreen(
+            payload,
+            top_n=5,
+            budget=5,
+            keywords=["NLP"],
+            negative_keywords=["艺术"],
+            contacted_teachers={},
+        )
+
+        candidate = result["top_candidates"][0]
+        self.assertIn("neutral_penalty", candidate["reasons"])
+        # profile_url 30 + person_like 8 + email 25 + senior_title 10 + has_interests 10
+        # - neutral_penalty 1 = 82
+        self.assertEqual(candidate["score"], 82)
 
 
 if __name__ == "__main__":

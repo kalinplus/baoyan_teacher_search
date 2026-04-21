@@ -35,6 +35,7 @@ def load_prescreen_scoring_config(path: Path = DEFAULT_PRESCREEN_SCORING_CONFIG_
         raise ValueError("Prescreen scoring config must be a JSON object")
 
     negative_signal_keywords = _require_string_list(payload, "negative_signal_keywords")
+    negative_interest_keywords = _require_string_list(payload, "negative_interest_keywords")
     evidence_fields = _require_string_list(payload, "evidence_fields")
 
     title_keywords_payload = payload.get("title_keywords")
@@ -59,6 +60,9 @@ def load_prescreen_scoring_config(path: Path = DEFAULT_PRESCREEN_SCORING_CONFIG_
         "missing_interests_penalty": _require_non_negative_int(weights_payload, "missing_interests_penalty"),
         "keyword_match_per_hit_bonus": _require_non_negative_int(weights_payload, "keyword_match_per_hit_bonus"),
         "keyword_match_bonus_cap": _require_non_negative_int(weights_payload, "keyword_match_bonus_cap"),
+        "negative_keyword_match_per_hit_penalty": _require_non_negative_int(weights_payload, "negative_keyword_match_per_hit_penalty"),
+        "negative_keyword_match_penalty_cap": _require_non_negative_int(weights_payload, "negative_keyword_match_penalty_cap"),
+        "neutral_penalty": _require_non_negative_int(weights_payload, "neutral_penalty"),
     }
 
     thresholds_payload = payload.get("thresholds")
@@ -77,6 +81,7 @@ def load_prescreen_scoring_config(path: Path = DEFAULT_PRESCREEN_SCORING_CONFIG_
 
     return {
         "negative_signal_keywords": negative_signal_keywords,
+        "negative_interest_keywords": negative_interest_keywords,
         "evidence_fields": evidence_fields,
         "title_keywords": {
             "senior": senior_title_keywords,
@@ -196,11 +201,34 @@ def _has_negative_signal_evidence(
     return False
 
 
+def _is_whole_word_match(text: str, keyword: str) -> bool:
+    if not text or not keyword:
+        return False
+    text_lower = text.lower()
+    keyword_lower = keyword.lower()
+    if keyword.isascii():
+        pattern = r"\b" + re.escape(keyword_lower) + r"\b"
+        return bool(re.search(pattern, text_lower))
+    pattern = r"(?<![a-zA-Z0-9])" + re.escape(keyword_lower) + r"(?![a-zA-Z0-9])"
+    return bool(re.search(pattern, text_lower))
+
+
+def _match_keywords_in_fields(fields: List[str], keywords: List[str]) -> List[str]:
+    matched: List[str] = []
+    for keyword in keywords:
+        for field in fields:
+            if field and _is_whole_word_match(field, keyword):
+                matched.append(keyword)
+                break
+    return list(dict.fromkeys(matched))
+
+
 def _score_teacher_profile(
     profile: Dict[str, object],
     keywords: List[str],
     scoring_config: Dict[str, Any],
-) -> tuple[int, str, List[str], List[str]]:
+    negative_keywords: List[str],
+) -> tuple[int, str, List[str], List[str], List[str]]:
     score = 0
     reasons: List[str] = []
     weights = scoring_config["weights"]
@@ -247,23 +275,19 @@ def _score_teacher_profile(
         score -= int(weights["missing_interests_penalty"])
         reasons.append("missing_interests")
 
+    search_fields: List[str] = [title, *interests]
+    homepage = profile.get("homepage")
+    if isinstance(homepage, dict):
+        for field in ("research_fields", "bio", "representative_works", "conferences"):
+            val = homepage.get(field)
+            if isinstance(val, list):
+                search_fields.extend(str(v) for v in val if str(v))
+            elif isinstance(val, str) and val:
+                search_fields.append(val)
+
     matched_keywords: List[str] = []
     if keywords:
-        search_parts = [title, *interests]
-        homepage = profile.get("homepage")
-        if isinstance(homepage, dict):
-            for field in ("research_fields", "bio", "representative_works", "conferences"):
-                val = homepage.get(field)
-                if isinstance(val, list):
-                    search_parts.extend(val)
-                elif isinstance(val, str) and val:
-                    search_parts.append(val)
-        search_text = " ".join(search_parts).lower()
-        for keyword in keywords:
-            if keyword.lower() in search_text:
-                matched_keywords.append(keyword)
-
-        matched_keywords = list(dict.fromkeys(matched_keywords))
+        matched_keywords = _match_keywords_in_fields(search_fields, keywords)
         if matched_keywords:
             score += min(
                 int(weights["keyword_match_bonus_cap"]),
@@ -273,9 +297,26 @@ def _score_teacher_profile(
         else:
             reasons.append("keyword_miss")
 
+    matched_negative_keywords: List[str] = []
+    if negative_keywords:
+        matched_negative_keywords = _match_keywords_in_fields(search_fields, negative_keywords)
+        if matched_negative_keywords:
+            penalty = min(
+                int(weights["negative_keyword_match_penalty_cap"]),
+                len(matched_negative_keywords) * int(weights["negative_keyword_match_per_hit_penalty"]),
+            )
+            score -= penalty
+            reasons.append(f"negative_keyword_match:{'|'.join(matched_negative_keywords)}")
+        else:
+            reasons.append("negative_keyword_miss")
+
+    if interests and not matched_keywords and not matched_negative_keywords:
+        score -= int(weights["neutral_penalty"])
+        reasons.append("neutral_penalty")
+
     final_score = max(int(thresholds["score_min"]), min(int(thresholds["score_max"]), score))
     tier = "A" if final_score >= int(thresholds["tier_a_min"]) else "B" if final_score >= int(thresholds["tier_b_min"]) else "C"
-    return final_score, tier, reasons, matched_keywords
+    return final_score, tier, reasons, matched_keywords, matched_negative_keywords
 
 
 def run_offline_prescreen(
@@ -286,6 +327,7 @@ def run_offline_prescreen(
     keywords: List[str],
     contacted_teachers: Dict[str, set[str]],
     negative_signal_keywords: Optional[List[str]] = None,
+    negative_keywords: Optional[List[str]] = None,
     scoring_config_path: Optional[Path] = None,
 ) -> Dict[str, object]:
     if top_n <= 0:
@@ -304,7 +346,8 @@ def run_offline_prescreen(
         raise ValueError("Prescreen payload missing teacher_profiles array")
 
     scoring_config = load_prescreen_scoring_config(scoring_config_path or DEFAULT_PRESCREEN_SCORING_CONFIG_PATH)
-    negative_keywords = negative_signal_keywords or list(scoring_config["negative_signal_keywords"])
+    evidence_negative_keywords = negative_signal_keywords or list(scoring_config["negative_signal_keywords"])
+    interest_negative_keywords = negative_keywords or list(scoring_config.get("negative_interest_keywords", []))
     evidence_fields = list(scoring_config["evidence_fields"])
     contacted_names = contacted_teachers.get(school, set())
 
@@ -325,13 +368,14 @@ def run_offline_prescreen(
                     "tier": "C",
                     "reasons": ["already_contacted"],
                     "matched_keywords": [],
+                    "matched_negative_keywords": [],
                     "skip_reason": "already_contacted",
                     "profile": profile,
                 }
             )
             continue
 
-        if _has_negative_signal_evidence(profile, negative_keywords, evidence_fields):
+        if _has_negative_signal_evidence(profile, evidence_negative_keywords, evidence_fields):
             skipped_items.append(
                 {
                     "name": teacher_name,
@@ -339,16 +383,18 @@ def run_offline_prescreen(
                     "tier": "C",
                     "reasons": ["negative_signal_evidence"],
                     "matched_keywords": [],
+                    "matched_negative_keywords": [],
                     "skip_reason": "negative_signal_evidence",
                     "profile": profile,
                 }
             )
             continue
 
-        score, tier, reasons, matched_keywords = _score_teacher_profile(
+        score, tier, reasons, matched_keywords, matched_negative_keywords = _score_teacher_profile(
             profile,
             keywords=keywords,
             scoring_config=scoring_config,
+            negative_keywords=interest_negative_keywords,
         )
         tier_counter[tier] += 1
         eligible_items.append(
@@ -358,6 +404,7 @@ def run_offline_prescreen(
                 "tier": tier,
                 "reasons": reasons,
                 "matched_keywords": matched_keywords,
+                "matched_negative_keywords": matched_negative_keywords,
                 "skip_reason": None,
                 "profile": profile,
             }
@@ -390,6 +437,7 @@ def run_offline_prescreen(
         "top_n": top_n,
         "budget": budget,
         "keywords": keywords,
+        "negative_keywords": interest_negative_keywords,
         "stats": {
             "total_profiles": len(raw_profiles),
             "scored_profiles": len(ranked),
