@@ -19,7 +19,7 @@ from pypinyin import Style, pinyin
 from utils import configure_logging, get_logger
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 UNIVERSITY_CONFIG_PATH = ROOT_DIR / "config" / "universities.json"
 COMPOUND_SURNAMES_CONFIG_PATH = ROOT_DIR / "config" / "compound_surnames.json"
 SCRAPER_ENDPOINT = "https://api.scraperapi.com/"

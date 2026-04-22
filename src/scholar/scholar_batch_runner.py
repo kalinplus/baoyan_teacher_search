@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List
 
-from scholar_client import ScholarAuthorClient
+from scholar.scholar_client import ScholarAuthorClient
 
 
 def run_scholar_batch(*, resolved_candidates: List[Dict[str, Any]], timeout: int) -> List[Dict[str, Any]]:

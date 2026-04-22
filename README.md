@@ -22,24 +22,24 @@ pip install -r requirements.txt
 
 ## CLI 入口
 
-唯一入口脚本：`src/scholar_client.py`
+唯一入口脚本：`src/scholar/scholar_client.py`
 
 执行示例：
 
 ```bash
-conda run -n baoyan python src/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
+conda run -n baoyan python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 ```
 
 显式 author_id 模式（可选）：
 
 ```bash
-conda run -n baoyan python src/scholar_client.py --school 南大 --teacher 周志华 --author-id rSVIHasAAAAJ --out-dir output
+conda run -n baoyan python src/scholar/scholar_client.py --school 南大 --teacher 周志华 --author-id rSVIHasAAAAJ --out-dir output
 ```
 
 仅获取 author_id 过程，且开启详细日志（便于排查 author_id 获取过程）：
 
 ```bash
-conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output --log-level DEBUG
+conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output --log-level DEBUG
 ```
 
 ## 输出路径

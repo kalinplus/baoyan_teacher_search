@@ -1,0 +1,4 @@
+1. AI生成文本检测（AI-Generated Text Detection）：基于LLM对齐过程中的偏好印记（Preference Discrepancy）进行零样本检测，关注模型对齐、输出分布分析
+2. 大语言模型安全与对齐（LLM Safety & Alignment）：对齐过程的副作用、鲁棒性评测
+3. 扩散模型推理加速（Diffusion Model Inference Acceleration）：特征缓存、泰勒展开预测、DiT架构优化
+4. 对以上方向有实际科研经验，偏好有理论深度且有系统实现落地的导师

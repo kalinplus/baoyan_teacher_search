@@ -11,7 +11,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from scholar_client import ScholarAuthorClient
+from scholar.scholar_client import ScholarAuthorClient
 
 
 class _FakeResponse:
@@ -34,7 +34,7 @@ class TestScholarClientPublicationsTruncated(unittest.TestCase):
         }
         client = ScholarAuthorClient(serpapi_key="test-key", timeout=1)
 
-        with patch("scholar_client.requests.get", return_value=_FakeResponse(payload)):
+        with patch("scholar.scholar_client.requests.get", return_value=_FakeResponse(payload)):
             profile = client.query_structured_info(author_id="abc")
 
         self.assertTrue(profile["publications_truncated"])
@@ -47,7 +47,7 @@ class TestScholarClientPublicationsTruncated(unittest.TestCase):
         }
         client = ScholarAuthorClient(serpapi_key="test-key", timeout=1)
 
-        with patch("scholar_client.requests.get", return_value=_FakeResponse(payload)):
+        with patch("scholar.scholar_client.requests.get", return_value=_FakeResponse(payload)):
             profile = client.query_structured_info(author_id="abc")
 
         self.assertFalse(profile["publications_truncated"])
@@ -61,7 +61,7 @@ class TestScholarClientPublicationsTruncated(unittest.TestCase):
         client = ScholarAuthorClient(serpapi_key="test-key", timeout=5)
 
         with patch(
-            "scholar_client.requests.get",
+            "scholar.scholar_client.requests.get",
             side_effect=[
                 requests.exceptions.Timeout("t1"),
                 requests.exceptions.Timeout("t2"),

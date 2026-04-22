@@ -6,6 +6,7 @@ from teacher_list_models import Rule
 from . import pku
 from . import sjtu
 from . import thu
+from . import zju
 
 
 def get_rules() -> List[Rule]:
@@ -13,4 +14,5 @@ def get_rules() -> List[Rule]:
         *pku.get_rules(),
         *sjtu.get_rules(),
         *thu.get_rules(),
+        *zju.get_rules(),
     ]

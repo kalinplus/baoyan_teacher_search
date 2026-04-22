@@ -1,0 +1,53 @@
+# 黄凯琳
+
+📧 kailin_huang@whu.edu.cn　|　📱 177-5975-2981　|　GitHub: kalinplus
+
+---
+
+## 教育背景
+
+**武汉大学** · 软件工程专业 　　　　　　　　　　　　　　2023.9 — 至今
+
+- GPA：3.93 / 4.0　|　专业排名：3 / 175（1.7%）　|　英语水平：CET-6 616
+- 程序设计 D92　|　机器学习 95　|　算法设计与分析 96　|　概率论与数理统计 99
+
+---
+
+## 荣誉奖项
+
+- 2023—2024 年度本专科生国家奖学金　　　　　　　　　　　　　　2024.12
+- 2024—2025 年度本专科生国家奖学金　　　　　　　　　　　　　　2025.12
+- 第四十一届美国大学生数学建模竞赛，M 奖（Meritorious Winner，Top 10%）　2025.5
+- 2025 年全国大学生计算机系统能力大赛，智能系统创新设计赛（小米杯）全国三等奖　2025.8
+
+---
+
+## 科研经历
+
+**清华深研院 | 科研实习**　　　　　　　　　　　　　　　　　　2025.9 — 2026.1
+
+在实习期间，聚焦于 AI 生成文本鉴别方向，提出 LAPD 框架，主导了从算法设计、代码实现到实验验证的全过程，作为共同一作撰写了论文 *Alignment Imprint: Zero-Shot AI-Generated Text Detection via Provable Preference Discrepancy*，现已投稿至 ICML 2026。
+
+- **动机和洞察：​** 现有 Likelihood-based 检测方法（如 Fast-DetectGPT）存在受文本内容复杂度干扰、性能不稳定的缺陷。据此提出核心洞察：LLM 的对齐过程会在输出分布上留下偏好印记，利用一对 Base/Aligned Model 对同一文本的偏好差异，可以抵消复杂度干扰，实现鲁棒检测。
+- **方法和实验：​** 基于上述分析，提出 LAPD 框架，首次利用 LLM 对齐过程引入的偏好差异进行检测。在 4 个主流 benchmark 上，LAPD 相比 SOTA（DNA-DetectLLM）和 Fast-DetectGPT 分别取得了 45.82% 和 56.99% 的相对 AUROC 提升，显著增强了复杂场景下的检测鲁棒性。
+- **我的贡献：​** 独立完成了 LAPD 的代码实现，并搭建了包含 9 种主流算法（涵盖 Fast-DetectGPT、Binoculars 等）的统一评测框架。在多模型、多领域及 benchmark 共计 2 万+ 条文本上进行了大规模评估与消融实验，系统验证了各组件的独立贡献及算法在跨域、跨模型场景下的鲁棒性。
+
+---
+
+## 项目经历
+
+**扩散模型推理加速开源项目 | 核心贡献者（GitHub 98 Stars）​**　　2025.8 — 2025.11
+
+复现了基于特征缓存与泰勒展开预测的 TaylorSeer 算法。该算法通过在特定时间步预测特征轨迹，跳过代价高昂的 Attention 与 MLP 层矩阵运算，在保持生成质量的前提下显著提升推理速度，解决了 DiT 架构扩散模型生成延迟高的问题。
+
+- 负责将已有算法适配至 HuggingFace Diffusers 标准架构下的 Qwen-Image 与 HunyuanVideo 等前沿模型，解决了代码复用率低与跨模型兼容性差的问题。
+- 代码已被合并至 Cache4Diffusers 主分支，作为贡献者持续维护项目。
+
+---
+
+## 专业技能
+
+- 熟练使用 Python（PyTorch、NumPy、Pandas、Matplotlib），熟悉 Linux 开发环境和 Git 版本控制
+- 了解 HuggingFace 生态，如 Transformers、Diffusers 等，使用过 DeepSpeed 分布式训练配置
+- 使用过 LaTeX 进行论文排版，具备英文学术论文阅读与写作能力
+- 对 LLM 分析与文本鉴伪、扩散模型推理加速及相关方向较为熟悉

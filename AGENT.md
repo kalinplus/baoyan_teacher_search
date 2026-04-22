@@ -10,14 +10,14 @@
 - 仅在必要时添加注释，注释应解释业务意图而不是逐行复述代码。
 
 ### Architecture
-- 当前唯一运行入口是 src/scholar_client.py。
+- 当前唯一运行入口是 src/scholar/scholar_client.py。
 - 通过 ScholarAuthorClient 类调用 SerpApi，主方法是 query_structured_info(author_id)。
 - 学校归一化配置来自 config/universities.json。
 - 输出目录结构固定为 output/{学校全称}/{老师姓名}/，包含 result.json 和 summary.md。
 
 ### Build and Test
 - 安装依赖: pip install -r requirements.txt
-- 运行命令: python src/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
+- 运行命令: python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 - 快速验收: python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text(encoding='utf-8'));print(d.get('name'))"
 - 当前仓库未配置单元测试框架；改动后至少执行一次运行命令和一次输出校验。
 

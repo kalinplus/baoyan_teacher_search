@@ -149,6 +149,7 @@ PROFILE_URL_PERSON_KEYWORDS = (
     "/staff/",
     "/profile/",
     "/professor/",
+    "person.",
 )
 
 

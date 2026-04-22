@@ -14,10 +14,10 @@ from typing import Any, Dict, List, Optional
 import requests
 from dotenv import load_dotenv
 
-from author_id_resolver import AuthorIdResolver
+from scholar.author_id_resolver import AuthorIdResolver
 
 
-ROOT_DIR = Path(__file__).resolve().parent.parent
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 UNIVERSITY_CONFIG_PATH = ROOT_DIR / "config" / "universities.json"
 SERPAPI_ENDPOINT = "https://serpapi.com/search.json"
 

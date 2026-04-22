@@ -15,7 +15,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from author_id_resolver import AuthorIdResolver, load_json, load_university_mapping, normalize_school_name
+from scholar.author_id_resolver import AuthorIdResolver, load_json, load_university_mapping, normalize_school_name
 
 
 REGRESSION_CASES_PATH = Path(__file__).resolve().parent / "data" / "author_id_regression_cases.json"
@@ -141,7 +141,7 @@ class TestAuthorIdResolverSearchQueryStrategy(unittest.TestCase):
 
         fake_body = "https://scholar.google.com/citations?user=t9HPFawAAAAJ&hl=en"
 
-        with patch("author_id_resolver.requests.get", return_value=FakeResponse(fake_body)) as mocked_get:
+        with patch("scholar.author_id_resolver.requests.get", return_value=FakeResponse(fake_body)) as mocked_get:
             author_ids = resolver.search_candidates(
                 teacher="huazhe, xu",
                 school="清华大学",
@@ -181,7 +181,7 @@ class TestAuthorIdResolverRetry(unittest.TestCase):
         fake_body = "https://scholar.google.com/citations?user=t9HPFawAAAAJ&hl=en"
 
         with patch(
-            "author_id_resolver.requests.get",
+            "scholar.author_id_resolver.requests.get",
             side_effect=[
                 requests.exceptions.Timeout("t1"),
                 requests.exceptions.Timeout("t2"),
@@ -208,7 +208,7 @@ class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
             isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
             with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
                 with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Huazhe Xu"):
-                    with patch("author_id_resolver.logger.warning") as mocked_warning:
+                    with patch("scholar.author_id_resolver.logger.warning") as mocked_warning:
                         resolver.resolve(
                             school="清华大学",
                             teacher="huazhe, xu",
@@ -225,7 +225,7 @@ class TestAuthorIdResolverTeacherInputWarnings(unittest.TestCase):
             isolated_cache = Path(tmp_dir) / ".cache" / "author_id_cache.json"
             with patch.object(resolver, "search_candidates", return_value=["t9HPFawAAAAJ"]):
                 with patch.object(resolver, "_fetch_scholar_profile_name", return_value="Huazhe Xu"):
-                    with patch("author_id_resolver.logger.warning") as mocked_warning:
+                    with patch("scholar.author_id_resolver.logger.warning") as mocked_warning:
                         resolver.resolve(
                             school="清华大学",
                             teacher="许华哲",

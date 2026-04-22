@@ -34,7 +34,7 @@ def _is_info_missing(teacher: Dict[str, Any]) -> bool:
     has_bio = bool(basic and basic.get("bio"))
     has_summary = bool(extended and extended.get("research_summary"))
     has_title = bool(basic and basic.get("title"))
-    has_raw_text = bool(teacher.get("homepage", {}).get("full_text", "").strip())
+    has_raw_text = bool((teacher.get("homepage") or {}).get("full_text", "").strip())
     if has_keywords or has_bio or has_summary:
         return False
     return not has_raw_text or not has_title

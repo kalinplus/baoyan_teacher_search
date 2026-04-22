@@ -11,10 +11,10 @@ from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 
-from author_id_resolver import UNIVERSITY_CONFIG_PATH, load_university_mapping, normalize_school_name
-from author_disambiguation import resolve_teacher_author_id
-from recommendation_assembler import assemble_final_recommendations
-from scholar_batch_runner import run_scholar_batch
+from scholar.author_id_resolver import UNIVERSITY_CONFIG_PATH, load_university_mapping, normalize_school_name
+from scholar.author_disambiguation import resolve_teacher_author_id
+from scholar.recommendation_assembler import assemble_final_recommendations
+from scholar.scholar_batch_runner import run_scholar_batch
 from utils import configure_logging, get_logger
 
 

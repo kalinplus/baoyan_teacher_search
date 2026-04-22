@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from author_id_resolver import AuthorIdResolver, UNIVERSITY_CONFIG_PATH, load_university_mapping, normalize_school_name
+from scholar.author_id_resolver import AuthorIdResolver, UNIVERSITY_CONFIG_PATH, load_university_mapping, normalize_school_name
 
 
 SKIP_REASON_AUTHOR_ID_CONFLICT = "author_id_conflict_existing_teacher"
