@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 import openai
 from openai import OpenAI
@@ -13,7 +14,7 @@ from utils import get_logger
 
 logger = get_logger(__name__)
 
-DEFAULT_MODEL = "deepseek-ai/DeepSeek-V3"
+DEFAULT_MODEL = "deepseek-ai/DeepSeek-V3.2"
 DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1"
 MAX_RETRIES = 2  # total attempts = MAX_RETRIES + 1 = 3
 
@@ -35,6 +36,11 @@ class LLMClient:
             max_retries=0,  # we handle retries ourselves
         )
 
+    @staticmethod
+    def _strip_markdown_json(text: str) -> str:
+        m = re.match(r"```(?:json)?\s*\n?(.*?)\n?\s*```", text, re.DOTALL)
+        return m.group(1) if m else text
+
     def extract_structured(self, system_prompt: str, user_text: str) -> dict:
         for attempt in range(MAX_RETRIES + 1):
             try:
@@ -49,6 +55,7 @@ class LLMClient:
                 raw = response.choices[0].message.content
                 if not raw:
                     raise ValueError("LLM returned empty content")
+                raw = self._strip_markdown_json(raw)
                 return json.loads(raw)
             except (openai.APIConnectionError, openai.APITimeoutError) as exc:
                 if attempt < MAX_RETRIES:
