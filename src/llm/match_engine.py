@@ -9,6 +9,8 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
+from dotenv import load_dotenv
+
 from utils import configure_logging, get_logger
 
 from llm.llm_client import LLMClient
@@ -17,6 +19,25 @@ from llm.prompts import MATCH_PROMPT
 logger = get_logger(__name__)
 
 DEFAULT_DELAY = 0.5
+
+_INFO_MISSING_RESULT = {
+    "match_score": 0,
+    "match_reasons": ["教师信息严重缺失，无法判断匹配度"],
+    "risk_flags": ["info_missing"],
+}
+
+
+def _is_info_missing(teacher: Dict[str, Any]) -> bool:
+    basic = teacher.get("llm_basic")
+    extended = teacher.get("llm_extended")
+    has_keywords = bool(basic and basic.get("research_keywords"))
+    has_bio = bool(basic and basic.get("bio"))
+    has_summary = bool(extended and extended.get("research_summary"))
+    has_title = bool(basic and basic.get("title"))
+    has_raw_text = bool(teacher.get("homepage", {}).get("full_text", "").strip())
+    if has_keywords or has_bio or has_summary:
+        return False
+    return not has_raw_text or not has_title
 
 
 def _build_teacher_summary(teacher: Dict[str, Any]) -> str:
@@ -70,22 +91,27 @@ def run_matching(
         name = teacher["name"]
         logger.info("[%d/%d] Matching %s...", i + 1, len(profiles), name)
 
-        teacher_summary = _build_teacher_summary(teacher)
-        user_prompt = f"## 教师信息\n{teacher_summary}\n\n{user_context}"
-
-        try:
-            result = client.extract_structured(MATCH_PROMPT, user_prompt)
-            rec = {
-                "teacher": name,
-                "match_score": result.get("match_score", 0),
-                "match_reasons": result.get("match_reasons", []),
-                "risk_flags": result.get("risk_flags", []),
-            }
+        if _is_info_missing(teacher):
+            rec = {"teacher": name, **_INFO_MISSING_RESULT}
             recommendations.append(rec)
-            stats["matched"] += 1
-        except Exception as exc:
-            logger.warning("LLM matching failed for %s: %s", name, exc)
-            stats["failed"] += 1
+            logger.info("Skipped %s: info missing", name)
+        else:
+            teacher_summary = _build_teacher_summary(teacher)
+            user_prompt = f"## 教师信息\n{teacher_summary}\n\n{user_context}"
+
+            try:
+                result = client.extract_structured(MATCH_PROMPT, user_prompt)
+                rec = {
+                    "teacher": name,
+                    "match_score": result.get("match_score", 0),
+                    "match_reasons": result.get("match_reasons", []),
+                    "risk_flags": result.get("risk_flags", []),
+                }
+                recommendations.append(rec)
+                stats["matched"] += 1
+            except Exception as exc:
+                logger.warning("LLM matching failed for %s: %s", name, exc)
+                stats["failed"] += 1
 
         output_data = {
             "school": data.get("school"),
@@ -101,6 +127,18 @@ def run_matching(
             time.sleep(delay)
 
     logger.info("Matching complete: %s", stats)
+
+    recommendations.sort(key=lambda r: r["match_score"], reverse=True)
+    output_data = {
+        "school": data.get("school"),
+        "college": data.get("college"),
+        "recommendations": recommendations,
+        "stats": stats,
+    }
+    Path(output_path).write_text(
+        json.dumps(output_data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    logger.info("Sorted %d recommendations by match_score", len(recommendations))
     return stats
 
 
@@ -117,6 +155,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
     configure_logging(args.log_level)
     stats = run_matching(args.input, args.resume, args.interests, args.output, delay=args.delay)
     print(json.dumps(stats, indent=2))
