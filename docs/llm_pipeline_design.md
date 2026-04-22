@@ -1,4 +1,6 @@
-# LLM Pipeline 设计讨论
+# LLM Pipeline 设计讨论（已落地归档）
+
+> **状态**：2026-04-21 已按本设计落地。模块位于 `src/llm/`，入口为 `src/llm/pipeline.py`。产出 5 个学院 recommendations.json。
 
 ## 整体流程
 

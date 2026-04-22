@@ -114,6 +114,8 @@ conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --t
 - 上海交通大学 计算机学院（CSE旧页兜底）：`PeopleList` 提取 `h2姓名 + PeopleDetail链接 + 研究领域`
 - 上海交通大学 浦江国际学院（原密西根学院）：教师详情 URL 模式 `faculty-detail` 抽取
 - 上海交通大学 溥渊未来技术学院：教师详情 URL 模式 `/faculty/{id}` 抽取
+- 浙江大学 计算机科学与技术学院：教师名录页自动提取 `name/profile_url/email/title`
+- 浙江大学 软件学院：教师名录页自动提取 `name/profile_url/email/title`
 
 关键词白名单配置：
 
@@ -126,19 +128,15 @@ conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --t
 - 上海交通大学 浦江国际学院（原密西根学院）：65
 - 上海交通大学 溥渊未来技术学院：64
 - 清华大学 计算机科学与技术系：191
-- 软件学院：41
-- 人工智能学院：13
-- 交叉信息研究院：75
-- 网络科学与网络空间研究院：110
-- 自动化系：103
-- 电子工程系：147
-- 深圳国际研究生院（计算机科学与技术方向）：87
-
-下一步优先计划（已设定，具体实现后续讨论）：
-
-- 顺序一：先打通单老师闭环（已实现两层 skip 校验，下一步补齐单老师 recommendation 输出与失败明细）。
-- 顺序二：单老师闭环稳定后，再做批量编排，读取 prescreen top_candidates 执行批量抓取与汇总。
-- 顺序三：增强推荐汇总规则，细化 recommendation_reason 与 risk_flags。
+- 清华大学 软件学院：41
+- 清华大学 人工智能学院：13
+- 清华大学 交叉信息研究院：75
+- 清华大学 网络科学与网络空间研究院：110
+- 清华大学 自动化系：103
+- 清华大学 电子工程系：147
+- 清华大学 深圳国际研究生院（计算机科学与技术方向）：87
+- 浙江大学 计算机科学与技术学院：~73
+- 浙江大学 软件学院：~98
 
 执行示例：
 
@@ -210,6 +208,56 @@ conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --coll
 - `failed_candidate_details`：失败老师维度明细，当前包含消歧阶段 skip 原因（`author_id_conflict_existing_teacher`、`scholar_name_mismatch`）
 - `recommendations` 单项字段：`teacher`、`prescreen_score`、`prescreen_tier`、`prescreen_reasons`、`author_id`、`author_id_source`、`scholar_metrics`、`recommendation_reason`、`risk_flags`
 
+## LLM Pipeline（任务3：匹配推荐）
+
+基于 SiliconFlow DeepSeek-V3 API 的端到端提取+匹配，替代规则评分：
+
+```bash
+# 端到端流水线（提取 + 匹配）
+conda run -n baoyan python src/llm/pipeline.py \
+  --input output/teacher_pool/上海交通大学/人工智能学院/teachers.json \
+  --resume docs/resume.txt \
+  --interests docs/interests.txt \
+  --output-dir output/上交AI推荐结果
+```
+
+分步执行：
+
+```bash
+# Step1: LLM 提取教师信息
+conda run -n baoyan python src/llm/profile_extractor.py \
+  --input output/teacher_pool/上海交通大学/人工智能学院/teachers.json \
+  --output output/上交AI推荐结果/llm_enriched.json
+
+# Step2: LLM 匹配推荐
+conda run -n baoyan python src/llm/match_engine.py \
+  --input output/上交AI推荐结果/llm_enriched.json \
+  --resume docs/resume.txt \
+  --interests docs/interests.txt \
+  --output output/上交AI推荐结果/recommendations.json
+```
+
+环境变量：`SILICONFLOW_API_KEY`
+
+输出：
+
+- `llm_enriched.json`：每个教师的 `llm_basic`（职称/邮箱/研究方向/bio/招生身份）与可选的 `llm_extended`（研究总结/招生状态/代表作/奖项/学术服务）
+- `recommendations.json`：按 `match_score` 排序的推荐列表，含 `match_reasons` 与 `risk_flags`
+
+## 可视化查看推荐结果
+
+将 `recommendations.json` 转换为可搜索/排序的 HTML：
+
+```bash
+# 批量转换 output/ 下所有推荐结果
+python recommendations_to_html.py
+
+# 只转换单个目录
+python recommendations_to_html.py -i "output/上交AI推荐结果"
+```
+
+生成 `html_report/index.html`（汇总首页）与各学院详情页，浏览器直接打开即可查看。
+
 ## 自动化验收命令
 
 - Step1
@@ -221,20 +269,22 @@ conda run -n baoyan python -c "print('contract-reviewed')"
 - Step2
 
 ```bash
-conda run -n baoyan python src/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output
+conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output
 ```
 
 - Step3
 
 ```bash
-conda run -n baoyan python src/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
+conda run -n baoyan python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 conda run -n baoyan python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text());print(d.get('name'))"
 ```
 
 ## 阶段文档索引
 
-- 任务描述: docs/task_descs.md
-- 阶段2进度: docs/task_descs.md
+- 任务描述与阶段进度: docs/task_descs.md
+- 架构与数据契约: docs/architecture.md
 - Step1契约: docs/task1/step1_contract.md
+- 批量闭环计划: docs/task1/batch_closed_loop_plan.md
+- LLM Pipeline 设计: docs/llm_pipeline_design.md
 - 问题归档: docs/archive/stage2_issues.md
 

@@ -6,7 +6,7 @@
 Step1 的目标是先固定契约与边界，避免后续实现阶段返工。
 
 ## 模块边界
-- 模块A（待实现）：AuthorIdResolver
+- 模块A（已落地）：AuthorIdResolver (`src/scholar/author_id_resolver.py`)
 - 职责: 根据 school + teacher 定位并返回 author_id
 - 输入: school, teacher
 - 输出: author_id 及来源信息（可选）

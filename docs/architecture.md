@@ -63,12 +63,22 @@
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│                  任务3: 推荐组装                             │
+│                  任务3: 推荐组装（规则版）                   │
 │                                                             │
 │  prescreen + scholar metrics                                │
 │    → recommendation_assembler ──→ final_recommendations.json│
 │                                                             │
 │  输出: 推荐理由 + 风险标记 + 失败明细                       │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│                  任务3b: LLM 匹配推荐（新版）                │
+│                                                             │
+│  teachers.json (with full_text)                             │
+│    → profile_extractor ──→ llm_enriched.json                │
+│    → match_engine ──→ recommendations.json                  │
+│                                                             │
+│  输入: 简历 + 研究兴趣; 输出: match_score + match_reasons   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -91,12 +101,22 @@
 
 | 文件 | 职责 |
 |------|------|
-| `scholar_client.py` | 通过 SerpApi 抓取 Google Scholar 学者主页（引用、发文、h-index 等） |
-| `author_id_resolver.py` | 自动发现 author_id：中文姓名→拼音→Google 搜索→正则提取→两层校验 |
-| `author_disambiguation.py` | author_id 解析的错误处理和 skip_reason 记录 |
-| `scholar_batch_runner.py` | 批量调用 Scholar 抓取 |
+| `scholar/scholar_client.py` | 通过 SerpApi 抓取 Google Scholar 学者主页（引用、发文、h-index 等） |
+| `scholar/author_id_resolver.py` | 自动发现 author_id：中文姓名→拼音→Google 搜索→正则提取→两层校验 |
+| `scholar/author_disambiguation.py` | author_id 解析的错误处理和 skip_reason 记录 |
+| `scholar/scholar_batch_runner.py` | 批量调用 Scholar 抓取 |
 | `batch_closed_loop.py` | 批量闭环编排：串联预筛→author_id→scholar→推荐，老师级容错 |
 | `recommendation_assembler.py` | 组装推荐理由和风险标记 |
+
+### 4.3 LLM Pipeline（任务3b）
+
+| 文件 | 职责 |
+|------|------|
+| `llm/llm_client.py` | SiliconFlow OpenAI-compatible API 封装，含重试与 JSON 解析 |
+| `llm/prompts.py` | 提取与匹配的 prompt 模板 |
+| `llm/profile_extractor.py` | Step3：从 `full_text` 批量提取结构化教师信息（basic + extended） |
+| `llm/match_engine.py` | Step4：基于简历/兴趣与教师信息做 LLM 匹配评分 |
+| `llm/pipeline.py` | 端到端编排：extraction → matching |
 
 ### 4.3 辅助
 
@@ -138,6 +158,7 @@ Rule(
 | 清华 | `teacher_extractors/thu.py` | 8（计算机、软件、AI、交叉信息、网络、自动化、电子工程、深研院） |
 | 上交 | `teacher_extractors/sjtu.py` | 5（AI学院全职/双聘、计算机、浦江、溥渊） |
 | 北大 | `teacher_extractors/pku.py` | 2（计算机学院、人工智能研究院） |
+| 浙大 | `teacher_extractors/zju.py` | 2（计算机学院、软件学院） |
 
 ### 5.4 新增学校步骤
 
@@ -243,37 +264,48 @@ Rule(
 1. **同名消歧**：author_id 自动发现仅取首个候选，同名时可能匹配错误
 2. **JS 渲染页面**：清华电子工程系(147人)用 JS 注入数据，无 profile_url，无法抓取详情
 3. **图片邮箱**：北大 CS 用图片拆分 `@` 符号，email 提取率仅 1%；上交 99%、清华 58%
-4. **推荐规则**：当前仅简单拼接，未做精细化排序
+4. **推荐规则**：规则版（recommendation_assembler）仅简单拼接；LLM 版（match_engine）已落地，但 prompt 质量仍在迭代中
 5. **增量更新**：无，每次全量抓取
 6. **Nav 噪音**：去重策略对双份菜单有效，但仅出现一次的导航项仍会残留少量
+7. **LLM 成本**：~1500 教师 × ~5k tokens ≈ 15M input tokens，每次全量运行需消耗 API 配额
 
 ## 十、目录结构
 
 ```
 ├── src/
-│   ├── scholar_client.py           # Scholar 抓取核心
-│   ├── author_id_resolver.py       # author_id 自动发现
-│   ├── author_disambiguation.py    # author_id 错误处理
-│   ├── scholar_batch_runner.py     # Scholar 批量执行
-│   ├── batch_closed_loop.py        # 批量闭环编排
-│   ├── recommendation_assembler.py # 推荐组装
-│   ├── teacher_list_collector.py   # 任务0 入口（含 --prescreen-dir 模式）
-│   ├── teacher_list_core.py        # 通用提取引擎
-│   ├── teacher_list_models.py      # 数据模型
-│   ├── teacher_list_helpers.py     # 文本工具
-│   ├── teacher_list_io.py          # IO 导出
-│   ├── teacher_list_prescreen.py   # 离线预筛（含 homepage 关键词匹配）
-│   ├── teacher_profile_scraper.py  # 教师详情页抓取（任务0.5）
-│   ├── teacher_extractors/         # 学校特定规则
-│   │   ├── __init__.py             # 规则注册
-│   │   ├── thu.py                  # 清华 (8 学院)
-│   │   ├── sjtu.py                 # 上交 (5 学院)
-│   │   └── pku.py                  # 北大 (2 学院)
-│   └── utils.py                    # 日志
-├── config/                         # 配置文件
-├── docs/                           # 文档
-├── tests/                          # 单测
-├── output/                         # 输出目录
+│   ├── scholar/
+│   │   ├── scholar_client.py           # Scholar 抓取核心
+│   │   ├── author_id_resolver.py       # author_id 自动发现
+│   │   ├── author_disambiguation.py    # author_id 错误处理
+│   │   └── scholar_batch_runner.py     # Scholar 批量执行
+│   ├── llm/
+│   │   ├── llm_client.py               # SiliconFlow API 封装
+│   │   ├── prompts.py                  # Prompt 模板
+│   │   ├── profile_extractor.py        # LLM 教师信息提取
+│   │   ├── match_engine.py             # LLM 匹配推荐
+│   │   └── pipeline.py                 # 端到端 LLM 流水线
+│   ├── teacher_list_collector.py       # 任务0 入口（含 --prescreen-dir 模式）
+│   ├── teacher_list_core.py            # 通用提取引擎
+│   ├── teacher_list_models.py          # 数据模型
+│   ├── teacher_list_helpers.py         # 文本工具
+│   ├── teacher_list_io.py              # IO 导出
+│   ├── teacher_list_prescreen.py       # 离线预筛（含 homepage 关键词匹配）
+│   ├── teacher_profile_scraper.py      # 教师详情页抓取（任务0.5）
+│   ├── teacher_extractors/             # 学校特定规则
+│   │   ├── __init__.py                 # 规则注册
+│   │   ├── thu.py                      # 清华 (8 学院)
+│   │   ├── sjtu.py                     # 上交 (5 学院)
+│   │   ├── pku.py                      # 北大 (2 学院)
+│   │   └── zju.py                      # 浙大 (2 学院)
+│   ├── batch_closed_loop.py            # 批量闭环编排
+│   ├── recommendation_assembler.py     # 推荐组装
+│   └── utils.py                        # 日志
+├── config/                             # 配置文件
+├── docs/                               # 文档
+├── tests/                              # 单测
+├── output/                             # 输出目录
+├── html_report/                        # HTML 推荐报告（由 recommendations_to_html.py 生成）
+├── recommendations_to_html.py          # recommendations.json → HTML 转换脚本
 ├── requirements.txt
-└── AGENT.md / CLAUDE.md            # AI 协作指令
+└── AGENT.md / CLAUDE.md                # AI 协作指令
 ```
