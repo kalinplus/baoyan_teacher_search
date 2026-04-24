@@ -116,6 +116,7 @@ conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --t
 - 上海交通大学 溥渊未来技术学院：教师详情 URL 模式 `/faculty/{id}` 抽取
 - 浙江大学 计算机科学与技术学院：教师名录页自动提取 `name/profile_url/email/title`
 - 浙江大学 软件学院：教师名录页自动提取 `name/profile_url/email/title`
+- 上海创智学院 学院导师：AJAX POST `/_wp3services/generalQuery` API 获取教师 JSON，提取 `name/profile_url/title/interests`
 
 关键词白名单配置：
 
@@ -137,6 +138,7 @@ conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --t
 - 清华大学 深圳国际研究生院（计算机科学与技术方向）：87
 - 浙江大学 计算机科学与技术学院：~73
 - 浙江大学 软件学院：~98
+- 上海创智学院 学院导师：73
 
 执行示例：
 

@@ -15,7 +15,7 @@
 
 ### 任务0：获取教师列表（Teacher Pool）
 - **状态**：已完成
-- **说明**：已实现 `teachers + teacher_profiles` 双轨输出，清华 8 个院系 + 上海交大 4 个院系 + 浙大 2 个院系已适配，策略为“自动识别优先，站点规则兜底”。
+- **说明**：已实现 `teachers + teacher_profiles` 双轨输出，清华 8 个院系 + 上海交大 4 个院系 + 浙大 2 个院系 + 上海创智学院 1 个院系已适配，策略为”自动识别优先，站点规则兜底”。
 - **字段契约**：见 `README.md`「任务0 Step2」章节。
 
 ### 任务1：获取基本信息并预筛 + 批量闭环
@@ -45,6 +45,7 @@
 
 ## 历史执行记录
 
+- 2026-04-24：新增上海创智学院（SII）教师页适配，通过 AJAX API 全量采集 73 位导师（全职/全时/分时）。
 - 2026-04-22：新增 `recommendations_to_html.py`，将 `recommendations.json` 批量转为可搜索/排序的 HTML 报告。
 - 2026-04-21：LLM Pipeline 落地（`src/llm/llm_client.py`、`prompts.py`、`profile_extractor.py`、`match_engine.py`、`pipeline.py`），接入 SiliconFlow DeepSeek-V3 API，产出 5 个学院 recommendations.json。
 - 2026-04-19：批量闭环模块（`batch_closed_loop.py`、`author_disambiguation.py`、`scholar_batch_runner.py`、`recommendation_assembler.py`）落地，补齐单测与文档同步。

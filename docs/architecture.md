@@ -159,6 +159,7 @@ Rule(
 | 上交 | `teacher_extractors/sjtu.py` | 5（AI学院全职/双聘、计算机、浦江、溥渊） |
 | 北大 | `teacher_extractors/pku.py` | 2（计算机学院、人工智能研究院） |
 | 浙大 | `teacher_extractors/zju.py` | 2（计算机学院、软件学院） |
+| 上海创智学院 | `teacher_extractors/sii.py` | 1（学院导师，AJAX API 模式） |
 
 ### 5.4 新增学校步骤
 
@@ -176,7 +177,7 @@ Rule(
 
 | 文件 | 用途 |
 |------|------|
-| `config/universities.json` | 52 所高校名称别名映射（输入归一化） |
+| `config/universities.json` | 53 所高校/机构名称别名映射（输入归一化） |
 | `config/compound_surnames.json` | 31 个复姓（拼音转换用） |
 | `config/sigs_subject_keywords.json` | 清华深研院学科白名单 |
 | `config/contacted_teachers.json` | 已联系教师名单（预筛硬过滤） |
@@ -296,7 +297,8 @@ Rule(
 │   │   ├── thu.py                      # 清华 (8 学院)
 │   │   ├── sjtu.py                     # 上交 (5 学院)
 │   │   ├── pku.py                      # 北大 (2 学院)
-│   │   └── zju.py                      # 浙大 (2 学院)
+│   │   ├── zju.py                      # 浙大 (2 学院)
+│   │   └── sii.py                      # 上海创智学院 (1 学院, AJAX API)
 │   ├── batch_closed_loop.py            # 批量闭环编排
 │   ├── recommendation_assembler.py     # 推荐组装
 │   └── utils.py                        # 日志

@@ -49,5 +49,6 @@
   "中国科学院信息工程研究所": ["中科院信工所", "信工所", "IIE", "Institute of Information Engineering, CAS"],
   "中国科学院微电子研究所": ["中科院微电子所", "微电子所", "IME", "Institute of Microelectronics, CAS"],
   "中国科学院空天信息创新研究院": ["中科院空天院", "空天院", "AIRCAS", "Aerospace Information Research Institute, CAS"],
-  "中国科学院数学与系统科学研究院": ["中科院数学院", "数学院", "AMSS", "Academy of Mathematics and Systems Science, CAS"]
+  "中国科学院数学与系统科学研究院": ["中科院数学院", "数学院", "AMSS", "Academy of Mathematics and Systems Science, CAS"],
+  "上海创智学院": ["创智", "SII", "Shanghai Innovation Institute"]
 }
