@@ -302,13 +302,353 @@ def extract_title(text: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Single profile scrape
+# SJTU CS structured profile scrape
 # ---------------------------------------------------------------------------
 
-def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
-    html = fetch_html(url, timeout=timeout)
-    text = clean_text(html_to_text(html))
+SJTU_CS_PROFILE_URL_PATTERN = re.compile(r"https?://www\.cs\.sjtu\.edu\.cn/jiaoshiml/[^/]+\.html")
 
+
+def _extract_sjtu_cs_js_info(html: str) -> Dict[str, Optional[str]]:
+    """Extract structured fields from the .js-info section."""
+    result: Dict[str, Optional[str]] = {
+        "name": None,
+        "title": None,
+        "email": None,
+        "phone": None,
+        "address": None,
+        "institute": None,
+        "personal_homepage": None,
+    }
+    start = html.find('<div class="js-info"')
+    if start == -1:
+        return result
+    # Find the matching closing </div> by tracking nesting depth
+    tag_start = html.find(">", start)
+    if tag_start == -1:
+        return result
+    tag_start += 1
+    depth = 1
+    pos = tag_start
+    while pos < len(html) and depth > 0:
+        next_open = html.find("<div", pos)
+        next_close = html.find("</div>", pos)
+        if next_close == -1:
+            break
+        if next_open != -1 and next_open < next_close:
+            depth += 1
+            pos = next_open + 4
+        else:
+            depth -= 1
+            pos = next_close + 6
+    info_html = html[start:pos]
+
+    m = re.search(r'<div class="name">(.*?)</div>', info_html)
+    if m:
+        result["name"] = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+
+    m = re.search(r'<div class="zw">(.*?)</div>', info_html)
+    if m:
+        result["title"] = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+
+    dt_start = info_html.find('<div class="dt">')
+    if dt_start != -1:
+        dt_html = info_html[dt_start:]
+        for p_match in re.finditer(r"<p>(.*?)</p>", dt_html):
+            p_clean = re.sub(r"<[^>]+>", "", p_match.group(1)).strip()
+            if p_clean.startswith("邮箱："):
+                result["email"] = p_clean.replace("邮箱：", "").strip()
+            elif p_clean.startswith("电话："):
+                result["phone"] = p_clean.replace("电话：", "").strip()
+            elif p_clean.startswith("地址："):
+                result["address"] = p_clean.replace("地址：", "").strip()
+            elif p_clean.startswith("所在研究所："):
+                result["institute"] = p_clean.replace("所在研究所：", "").strip()
+            elif p_clean.startswith("个人主页："):
+                href_match = re.search(r'href=["\']([^"\']+)["\']', p_match.group(1))
+                if href_match:
+                    result["personal_homepage"] = href_match.group(1).strip()
+
+    return result
+
+
+def _extract_sjtu_cs_bio(html: str) -> str:
+    """Extract full bio text from the '个人简介' section inside .js-dt."""
+    start = html.find('<div class="js-dt">')
+    if start == -1:
+        return ""
+    end = html.find('<div class="footer">', start)
+    if end == -1:
+        end = html.find('<div class="clear">', start)
+    if end == -1:
+        end = start + 20000
+    dt_html = html[start:end]
+
+    item_pattern = re.compile(
+        r'<div class="item item2">\s*<div class="name"><p>(.*?)</p></div>\s*<div class="txt">(.*?)</div>\s*</div>',
+        re.DOTALL,
+    )
+    for title_match, content_match in item_pattern.findall(dt_html):
+        title = re.sub(r"<[^>]+>", "", title_match).strip()
+        if title == "个人简介":
+            bio = re.sub(r"<[^>]+>", " ", content_match)
+            bio = re.sub(r"\s+", " ", bio).strip()
+            return bio
+    return ""
+
+
+def _scrape_sjtu_cs_profile(html: str, url: str) -> Dict[str, object]:
+    """Structured scrape for SJTU CS faculty profile pages.
+
+    Produces a clean, structured full_text for LLM consumption.
+    """
+    info = _extract_sjtu_cs_js_info(html)
+    bio = _extract_sjtu_cs_bio(html)
+
+    lines: list[str] = []
+    if info.get("name"):
+        lines.append(f"姓名：{info['name']}")
+    if info.get("title"):
+        lines.append(f"职称：{info['title']}")
+    if info.get("email"):
+        lines.append(f"邮箱：{info['email']}")
+    if info.get("phone"):
+        lines.append(f"电话：{info['phone']}")
+    if info.get("address"):
+        lines.append(f"地址：{info['address']}")
+    if info.get("institute"):
+        lines.append(f"所在研究所：{info['institute']}")
+    if info.get("personal_homepage"):
+        lines.append(f"个人主页：{info['personal_homepage']}")
+
+    if bio:
+        lines.append("")
+        lines.append("个人简介：")
+        lines.append(bio)
+
+    full_text = "\n".join(lines)
+
+    # Derive research_fields from bio text (SJTU pages don't have a dedicated section)
+    research_fields: list[str] = []
+    if bio:
+        patterns = [
+            re.compile(r"主要研究方向为\s*[:：]?\s*([^。\n]+)"),
+            re.compile(r"研究方向为\s*[:：]?\s*([^。\n]+)"),
+            re.compile(r"研究方向\s*[:：]\s*([^。\n]+)"),
+            re.compile(r"研究兴趣主要集中在\s*([^。\n]+)"),
+            re.compile(r"主要研究领域为\s*[:：]?\s*([^。\n]+)"),
+        ]
+        # Boundary words that indicate the description has moved past research fields
+        boundary_words = ("研究成果", "曾获", "目前担任", "曾任", "在", "发表", "获得",
+                          "荣誉", "论文", "项目", "基金", "主持", "参与", "合作")
+        for pat in patterns:
+            m = pat.search(bio)
+            if m:
+                raw = m.group(1).strip()
+                # Cut entire raw at first boundary word before splitting
+                for bw in boundary_words:
+                    idx = raw.find(bw)
+                    if idx != -1:
+                        raw = raw[:idx].strip().rstrip("，,、")
+                        break
+                parts = re.split(r"[、,，;；/|]+", raw)
+                for part in parts:
+                    part = part.strip()
+                    # Skip descriptive fragments
+                    if part.startswith("涵盖了") or part.startswith("尤其是") or part.endswith("等方面"):
+                        continue
+                    if 2 <= len(part) <= 40:
+                        research_fields.append(part)
+                if research_fields:
+                    break
+
+    # Keep conference extraction running on the full_text
+    conferences = list(dict.fromkeys(CONFERENCE_PATTERN.findall(full_text)))
+
+    return {
+        "full_text": full_text,
+        "research_fields": research_fields if research_fields else None,
+        "bio": bio if bio else None,
+        "email": info.get("email"),
+        "title": info.get("title"),
+        "representative_works": None,
+        "personal_homepage": info.get("personal_homepage"),
+        "recruiting_status": extract_recruiting_status(full_text),
+        "conferences": conferences if conferences else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# THU CS structured profile scrape
+# ---------------------------------------------------------------------------
+
+THU_CS_PROFILE_URL_PATTERN = re.compile(r"https?://www\.cs\.tsinghua\.edu\.cn/info/\d+/\d+\.htm")
+
+
+def _extract_thu_cs_vnews(html: str) -> str:
+    start = html.find('<div class="v_news_content">')
+    if start == -1:
+        m = re.search(r'<div\b[^>]*class=["\'][^"\']*v_news_content[^"\']*["\'][^>]*>', html)
+        if not m:
+            return ""
+        start = m.start()
+    tag_start = html.find(">", start)
+    if tag_start == -1:
+        return ""
+    tag_start += 1
+    depth = 1
+    pos = tag_start
+    while pos < len(html) and depth > 0:
+        next_open = html.find("<div", pos)
+        next_close = html.find("</div>", pos)
+        if next_close == -1:
+            break
+        if next_open != -1 and next_open < next_close:
+            depth += 1
+            pos = next_open + 4
+        else:
+            depth -= 1
+            pos = next_close + 6
+    return html[start:pos]
+
+
+def _scrape_thu_cs_profile(html: str, url: str) -> Dict[str, object]:
+    vnews_html = _extract_thu_cs_vnews(html)
+    if not vnews_html:
+        text = clean_text(html_to_text(html))
+        return _scrape_generic_profile(text)
+
+    name: Optional[str] = None
+    title: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    personal_homepage: Optional[str] = None
+
+    p_tags = re.findall(r'<p[^>]*>(.*?)</p>', vnews_html, re.IGNORECASE | re.DOTALL)
+    for p_html in p_tags:
+        p_text = re.sub(r'<[^>]+>', '', p_html).strip()
+        if p_text.startswith('姓名：'):
+            name = p_text.replace('姓名：', '').strip()
+        elif p_text.startswith('职称：'):
+            title = p_text.replace('职称：', '').strip()
+        elif p_text.startswith('支撑：'):
+            title = p_text.replace('支撑：', '').strip()
+        elif p_text.startswith('电话：'):
+            phone = p_text.replace('电话：', '').strip()
+        elif p_text.startswith('邮箱：'):
+            email = p_text.replace('邮箱：', '').strip()
+        elif p_text.startswith('主页：'):
+            href_match = re.search(r'href=["\']([^"\']+)["\']', p_html)
+            personal_homepage = href_match.group(1).strip() if href_match else p_text.replace('主页：', '').strip()
+        elif p_text.startswith('个人主页：'):
+            href_match = re.search(r'href=["\']([^"\']+)["\']', p_html)
+            personal_homepage = href_match.group(1).strip() if href_match else p_text.replace('个人主页：', '').strip()
+
+    # Fallback for alternate template (no 姓名：/职称： prefixes)
+    if not name:
+        for p_html in p_tags:
+            p_text = re.sub(r'<[^>]+>', '', p_html).strip()
+            if CHINESE_NAME_PATTERN.fullmatch(p_text):
+                name = p_text
+                break
+    if not title:
+        for p_html in p_tags:
+            p_text = re.sub(r'<[^>]+>', '', p_html).strip()
+            if TITLE_PATTERN.fullmatch(p_text):
+                title = p_text
+                break
+    if not email:
+        for p_html in p_tags:
+            p_text = re.sub(r'<[^>]+>', '', p_html).strip()
+            email_match = EMAIL_STANDARD.search(p_text)
+            if email_match:
+                email = email_match.group(0).lower()
+                break
+
+    sections: Dict[str, str] = {}
+    # Primary: <h4><p>Title</p></h4>
+    section_pattern = re.compile(
+        r'<h4[^>]*>\s*<p[^>]*>(.*?)</p>\s*</h4>\s*(.*?)(?=<h4[^>]*>|$)',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for heading_html, content_html in section_pattern.findall(vnews_html):
+        heading = re.sub(r'<[^>]+>', '', heading_html).strip()
+        if heading == '研究领域':
+            first_p = re.search(r'<p[^>]*>(.*?)</p>', content_html, re.IGNORECASE | re.DOTALL)
+            content = re.sub(r'<[^>]+>', ' ', first_p.group(1)).strip() if first_p else ''
+        else:
+            content = re.sub(r'<[^>]+>', ' ', content_html).strip()
+        content = re.sub(r'\s+', ' ', content).strip()
+        sections[heading] = content
+
+    # Alternate: <p><strong>Title</strong></p> or <p><b>Title</b></p>
+    alt_section_pattern = re.compile(
+        r'<p[^>]*>\s*(?:<strong>|<b>)(.*?)(?:</strong>|</b>)\s*</p>\s*(.*?)(?=<p[^>]*>\s*(?:<strong>|<b>)|$)',
+        re.IGNORECASE | re.DOTALL,
+    )
+    for heading_html, content_html in alt_section_pattern.findall(vnews_html):
+        heading = re.sub(r'<[^>]+>', '', heading_html).strip()
+        if heading in sections:
+            continue
+        if heading == '研究领域':
+            first_p = re.search(r'<p[^>]*>(.*?)</p>', content_html, re.IGNORECASE | re.DOTALL)
+            content = re.sub(r'<[^>]+>', ' ', first_p.group(1)).strip() if first_p else ''
+        else:
+            content = re.sub(r'<[^>]+>', ' ', content_html).strip()
+        content = re.sub(r'\s+', ' ', content).strip()
+        sections[heading] = content
+
+    research_fields: list[str] = []
+    if '研究领域' in sections:
+        raw = sections['研究领域']
+        parts = re.split(r'[、,，;；/|]+', raw)
+        for part in parts:
+            part = part.strip()
+            if 2 <= len(part) <= 40:
+                research_fields.append(part)
+
+    bio = sections.get('研究概况') or sections.get('教育背景') or ""
+
+    lines: list[str] = []
+    if name:
+        lines.append(f"姓名：{name}")
+    if title:
+        lines.append(f"职称：{title}")
+    if phone:
+        lines.append(f"电话：{phone}")
+    if email:
+        lines.append(f"邮箱：{email}")
+    if personal_homepage:
+        lines.append(f"个人主页：{personal_homepage}")
+    if research_fields:
+        lines.append("")
+        lines.append(f"研究领域：{'、'.join(research_fields)}")
+    if bio:
+        lines.append("")
+        lines.append("研究概况：")
+        lines.append(bio)
+    for heading in ['教育背景', '社会兼职', '奖励与荣誉', '学术成果', '工作经历']:
+        if heading in sections and sections[heading]:
+            lines.append("")
+            lines.append(f"{heading}：")
+            lines.append(sections[heading])
+
+    full_text = "\n".join(lines)
+    conferences = list(dict.fromkeys(CONFERENCE_PATTERN.findall(full_text)))
+
+    return {
+        "full_text": full_text,
+        "research_fields": research_fields if research_fields else None,
+        "bio": bio if bio else None,
+        "email": email,
+        "title": title,
+        "representative_works": sections.get('学术成果') or None,
+        "personal_homepage": personal_homepage,
+        "recruiting_status": extract_recruiting_status(full_text),
+        "conferences": conferences if conferences else None,
+    }
+
+
+def _scrape_generic_profile(text: str) -> Dict[str, object]:
     research_fields = extract_research_fields(text)
     works = extract_representative_works(text)
     bio = extract_bio(text, research_fields, works)
@@ -329,6 +669,23 @@ def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
         "recruiting_status": recruiting,
         "conferences": conferences if conferences else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Single profile scrape
+# ---------------------------------------------------------------------------
+
+def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
+    html = fetch_html(url, timeout=timeout)
+
+    if SJTU_CS_PROFILE_URL_PATTERN.match(url):
+        return _scrape_sjtu_cs_profile(html, url)
+
+    if THU_CS_PROFILE_URL_PATTERN.match(url):
+        return _scrape_thu_cs_profile(html, url)
+
+    text = clean_text(html_to_text(html))
+    return _scrape_generic_profile(text)
 
 
 # ---------------------------------------------------------------------------

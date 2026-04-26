@@ -22,6 +22,10 @@ from teacher_extractors.thu import (
     extract_thu_thss_faculty_profiles,
     extract_thu_thss_faculty_names,
 )
+from teacher_extractors.fdu import (
+    extract_fdu_profiles,
+    supports_fdu_teachers,
+)
 from teacher_extractors.sjtu import (
     extract_sjtu_cs_main_profiles,
     extract_sjtu_cse_people_profiles,
@@ -354,6 +358,33 @@ class TestTeacherListCollectorRules(unittest.TestCase):
         self.assertEqual([p.name for p in profiles], ["Youyi Bi"])
         self.assertEqual(profiles[0].profile_url, "/about/faculty-staff/faculty-directory/faculty-detail/24")
         self.assertEqual(profiles[0].email, "youyi.bi@sjtu.edu.cn")
+
+    def test_supports_fdu_teachers(self) -> None:
+        self.assertTrue(supports_fdu_teachers("https://cs.fudan.edu.cn/53162/list.htm"))
+        self.assertFalse(supports_fdu_teachers("https://cs.tsinghua.edu.cn/"))
+
+    def test_extract_fdu_profiles_from_api_response(self) -> None:
+        fake_response = _FakeJsonResponse(payload={
+            "data": [
+                {"title": "安海龙", "cnUrl": "http://ai.fudan.edu.cn/ahl/list.htm", "email": "anhl@fudan.edu.cn", "career": "", "exField9": "初中级"},
+                {"title": "薄格", "cnUrl": "http://ai.fudan.edu.cn/bg/list.htm", "email": "", "career": "", "exField9": ""},
+                {"title": "张三", "cnUrl": "", "email": "", "career": "", "exField9": "正高"},
+                {"title": "", "cnUrl": "http://ai.fudan.edu.cn/x/list.htm", "email": "x@fudan.edu.cn", "career": "", "exField9": ""},
+                {"title": "English Name", "cnUrl": "http://ai.fudan.edu.cn/en/list.htm", "email": "en@fudan.edu.cn", "career": "", "exField9": "副高"},
+            ]
+        })
+
+        with patch("teacher_extractors.fdu.requests.post", return_value=fake_response):
+            profiles = extract_fdu_profiles("<html></html>", source_url="https://cs.fudan.edu.cn/53162/list.htm")
+
+        names = [p.name for p in profiles]
+        self.assertEqual(names, ["安海龙", "薄格", "张三"])
+        self.assertEqual(profiles[0].profile_url, "http://ai.fudan.edu.cn/ahl/list.htm")
+        self.assertEqual(profiles[0].email, "anhl@fudan.edu.cn")
+        self.assertEqual(profiles[0].title, "初中级")
+        self.assertEqual(profiles[1].title, None)
+        self.assertEqual(profiles[2].title, "正高")
+        self.assertEqual(profiles[2].profile_url, None)
 
     def test_collect_teachers_outputs_teacher_profiles_contract(self) -> None:
         html = """

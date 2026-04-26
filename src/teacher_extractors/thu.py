@@ -9,6 +9,7 @@ from typing import List
 
 import requests
 
+from teacher_list_helpers import absolutize_url
 from teacher_list_models import Rule, TeacherProfile
 
 
@@ -83,6 +84,54 @@ def extract_thu_cs_h2_anchor_names(html: str) -> List[str]:
     pattern = re.compile(r"<h2>\s*<a[^>]*>(.*?)</a>\s*</h2>", re.IGNORECASE | re.DOTALL)
     candidates = pattern.findall(html)
     return [strip_html_tags(unescape(name)) for name in candidates]
+
+
+_THU_CS_TITLE_PATTERN = re.compile(r"^(教授|副教授|助理教授|研究员|副研究员|助理研究员|工程师|博士后|讲师|高级实验师|实验师)$")
+_EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+")
+
+
+def extract_thu_cs_profiles(html: str, source_url: str) -> List[TeacherProfile]:
+    li_pattern = re.compile(r"<li\b[^>]*>(.*?)</li>", re.IGNORECASE | re.DOTALL)
+    h2_pattern = re.compile(
+        r'<h2>\s*<a[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>\s*</h2>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    p_pattern = re.compile(r"<p[^>]*>(.*?)</p>", re.IGNORECASE | re.DOTALL)
+
+    profiles: List[TeacherProfile] = []
+    for li_html in li_pattern.findall(html):
+        h2_match = h2_pattern.search(li_html)
+        if not h2_match:
+            continue
+
+        href = h2_match.group(1)
+        name = strip_html_tags(unescape(h2_match.group(2))).strip()
+        profile_url = absolutize_url(href, source_url)
+
+        title = None
+        email = None
+        for p_html in p_pattern.findall(li_html):
+            p_text = strip_html_tags(unescape(p_html)).strip()
+            if not p_text:
+                continue
+            if _THU_CS_TITLE_PATTERN.match(p_text):
+                title = p_text
+            elif not email:
+                email_match = _EMAIL_PATTERN.search(p_text)
+                if email_match:
+                    email = email_match.group(0).lower()
+
+        profiles.append(
+            TeacherProfile(
+                name=name,
+                profile_url=profile_url,
+                email=email,
+                interests=[],
+                title=title,
+                source_url=source_url,
+            )
+        )
+    return profiles
 
 
 def extract_thu_thss_faculty_names(html: str) -> List[str]:
@@ -268,6 +317,7 @@ def get_rules() -> List[Rule]:
             name="thu_cs_h2_anchor",
             matcher=supports_thu_cs,
             extractor=extract_thu_cs_h2_anchor_names,
+            profile_extractor=extract_thu_cs_profiles,
         ),
         Rule(
             name="thu_thss_faculty_anchor",
