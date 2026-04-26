@@ -34,10 +34,14 @@ pip-wheel-metadata/
 
 # Generated output
 output/
+html_report
 
 # IDE and OS
 .DS_Store
 .idea/
 .vscode/
-html_report
+
+# Personal files
 .claude
+interests.txt
+resume.txt

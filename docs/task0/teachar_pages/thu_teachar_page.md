@@ -9,6 +9,20 @@ URL：https://www.cs.tsinghua.edu.cn/szzk/jzgml.htm
 人名区域：各研究所按正高/副高/中级分组，姓名在 `h2 > a` 标签文本中，如 `<h2><a href="...">冯建华</a></h2>`
 姓名样本：冯建华、冯铃、李国良、李涓子、唐杰、王建勇、喻文健、周强、陈渝、艾海舟
 限制：无登录，无验证码；注意页面标注为"2020年1月更新"，部分人员信息可能已过时
+
+**个人主页结构（已适配结构化解析）**
+- URL 模式：`https://www.cs.tsinghua.edu.cn/info/{treeid}/{articleid}.htm`
+- 页面使用统一 CMS 模板（Visual SiteBuilder），内容在 `<div class="v_news_content">` 中
+- 固定字段序列（`<p>` 标签）：`姓名：xxx`、`职称：xxx`、`电话：xxx`、`邮箱：xxx`、`主页：URL`
+- 分节标题有两种模板：
+  1. 主模板：`<h4><p>教育背景/社会兼职/研究领域/研究概况/...</p></h4>`
+  2. Alternate 模板：`<p><strong>教育背景/研究领域/...</strong></p>`（约 2% 页面使用）
+- `teacher_profile_scraper.py` 已为其增加 `_scrape_thu_cs_profile` 结构化解析路径：
+  - 通过 div 嵌套深度跟踪精确提取 `v_news_content` 区域
+  - 从 `<p>` 标签提取 email、title、personal_homepage，避免导航污染
+  - 按 `<h4>` / `<strong>` 分节提取 "研究领域" / "研究概况" / "学术成果"
+  - "研究领域" 仅取首 `<p>`，防止后续 "讲授课程" / "教学概况" 子段混入 research_fields
+  - 组装为结构化 `full_text` 供 LLM 消费，`full_text` 从 103 行压缩到 ~20 行
 ```
 
 ---

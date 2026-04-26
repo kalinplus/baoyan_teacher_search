@@ -4,7 +4,7 @@
 
 保研导师信息抓取与推荐系统。输入学校+学院，输出导师推荐列表（含学术指标、研究方向、推荐理由）。
 
-核心思路：**分层漏斗**，先用免费信息做预筛，再用付费 API 做精筛，控制成本。
+核心思路：~~**分层漏斗**，先用免费信息做预筛，再用付费 API 做精筛，控制成本。~~（已调整：预筛已废弃，全部候选直接通过 LLM Pipeline 完成提取与匹配。）
 
 ## 二、技术栈
 
@@ -42,16 +42,17 @@
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│                    任务1: 离线预筛                           │
+│                    ~~任务1: 离线预筛~~（已废弃）             │
 │                                                             │
-│  teachers.json + contacted_teachers.json + scoring.json      │
-│       ──→ teacher_list_prescreen ──→ prescreen.json         │
+│  ~~teachers.json + contacted_teachers.json + scoring.json~~  │
+│       ~~──→ teacher_list_prescreen ──→ prescreen.json~~     │
 │                                                             │
-│  入口: collector --prescreen-dir (读磁盘，不重新采集)        │
-│  逻辑: 硬过滤(已联系/负面信号) → 加权评分(含 homepage 关键词│
-│       匹配) → A/B/C分层 → top_n 裁剪                       │
+│  ~~入口: collector --prescreen-dir~~                         │
+│  ~~逻辑: 硬过滤 → 加权评分 → A/B/C分层 → top_n 裁剪~~        │
+│                                                             │
+│  废弃原因: 规则预筛已由 LLM Pipeline 替代，全部候选直接打分。│
 └──────────────────────────┬──────────────────────────────────┘
-                           │ top_candidates (通常 20 人)
+                           │ ~~top_candidates~~ → 全部候选直接进 LLM
 ┌──────────────────────────▼──────────────────────────────────┐
 │                  任务2: Scholar 抓取                         │
 │                                                             │
@@ -88,25 +89,27 @@
 
 | 文件 | 职责 |
 |------|------|
-| `teacher_list_collector.py` | CLI 入口，调度抓取流程；`--prescreen-dir` 模式从磁盘读取做预筛 |
+| `teacher_list_collector.py` | CLI 入口，调度抓取流程 |
 | `teacher_list_core.py` | 通用提取引擎：自动提取 + 规则兜底 + 质量比较 |
 | `teacher_list_models.py` | 数据模型：`TeacherProfile`、`SourceRecord`、`Rule` |
 | `teacher_list_helpers.py` | 文本工具：姓名识别、噪音过滤、URL 解析、兴趣提取 |
 | `teacher_list_io.py` | 输入读取、JSON/JSONL 导出 |
-| `teacher_list_prescreen.py` | 离线预筛引擎（硬过滤 + 评分 + homepage关键词匹配 + 分层） |
+| ~~`teacher_list_prescreen.py`~~ | ~~离线预筛引擎（已废弃）~~ |
 | `teacher_profile_scraper.py` | 教师详情页抓取：提取研究方向/bio/email/title/代表工作/个人主页 |
 | `teacher_extractors/` | **学校特定规则**，每个学校一个 `.py` |
 
-### 4.2 Scholar 抓取 + 推荐（任务2/3）
+> **已废弃**：Google Scholar 结构化信息抓取与规则版推荐已不再维护。预筛后的候选直接进入 LLM Pipeline（任务3b）完成匹配推荐。
+
+### ~~4.2 Scholar 抓取 + 推荐（任务2/3）~~
 
 | 文件 | 职责 |
 |------|------|
-| `scholar/scholar_client.py` | 通过 SerpApi 抓取 Google Scholar 学者主页（引用、发文、h-index 等） |
-| `scholar/author_id_resolver.py` | 自动发现 author_id：中文姓名→拼音→Google 搜索→正则提取→两层校验 |
-| `scholar/author_disambiguation.py` | author_id 解析的错误处理和 skip_reason 记录 |
-| `scholar/scholar_batch_runner.py` | 批量调用 Scholar 抓取 |
-| `batch_closed_loop.py` | 批量闭环编排：串联预筛→author_id→scholar→推荐，老师级容错 |
-| `recommendation_assembler.py` | 组装推荐理由和风险标记 |
+| ~~`scholar/scholar_client.py`~~ | ~~通过 SerpApi 抓取 Google Scholar 学者主页（引用、发文、h-index 等）~~ |
+| ~~`scholar/author_id_resolver.py`~~ | ~~自动发现 author_id：中文姓名→拼音→Google 搜索→正则提取→两层校验~~ |
+| ~~`scholar/author_disambiguation.py`~~ | ~~author_id 解析的错误处理和 skip_reason 记录~~ |
+| ~~`scholar/scholar_batch_runner.py`~~ | ~~批量调用 Scholar 抓取~~ |
+| ~~`batch_closed_loop.py`~~ | ~~批量闭环编排：串联预筛→author_id→scholar→推荐，老师级容错~~ |
+| ~~`recommendation_assembler.py`~~ | ~~组装推荐理由和风险标记~~ |
 
 ### 4.3 LLM Pipeline（任务3b）
 
@@ -180,8 +183,8 @@ Rule(
 | `config/universities.json` | 53 所高校/机构名称别名映射（输入归一化） |
 | `config/compound_surnames.json` | 31 个复姓（拼音转换用） |
 | `config/sigs_subject_keywords.json` | 清华深研院学科白名单 |
-| `config/contacted_teachers.json` | 已联系教师名单（预筛硬过滤） |
-| `config/prescreen_scoring.json` | 预筛评分权重和分层阈值 |
+| `config/contacted_teachers.json` | 已联系教师名单（历史配置，随预筛废弃不再使用） |
+| ~~`config/prescreen_scoring.json`~~ | ~~预筛评分权重和分层阈值（已废弃）~~ |
 | `docs/task0/source_urls.json` | 抓取目标 URL 列表（学校/学院/URL） |
 
 ## 七、数据契约
@@ -218,7 +221,9 @@ Rule(
 }
 ```
 
-### 7.2 最终推荐输出 (`final_recommendations.json`)
+### ~~7.2 最终推荐输出 (`final_recommendations.json`)~~（已废弃）
+
+> 该输出为规则版推荐（任务3）的产物，随 Scholar 链路一同废弃。当前推荐输出为 `recommendations.json`（LLM Pipeline 产物）。
 
 ```json
 {
@@ -252,20 +257,20 @@ Rule(
 |------|------|------|
 | HTML 解析 | 正则，无 BeautifulSoup | 减少依赖，页面结构简单够用 |
 | 自动提取 vs 规则 | 自动优先，规则兜底 | 无规则学校也能用，规则提供更精确结果 |
-| 作者发现 | Google 搜索 + 缓存 + 两层校验 | 自动化，但需要付费代理 |
-| 预筛策略 | 配置驱动评分 | 调参不改代码 |
+| ~~作者发现~~（已废弃） | ~~Google 搜索 + 缓存 + 两层校验~~ | ~~随 Scholar 链路废弃~~ |
+| ~~预筛策略~~（已废弃） | ~~配置驱动评分~~ | ~~已由 LLM 打分替代~~ |
 | 批量容错 | 老师级 continue | 单失败不阻塞整批 |
 | 分页抓取 | 在 extractor 内部发请求 | 对调用方透明 |
-| 预筛与采集解耦 | `--prescreen-dir` 读磁盘 | 避免重新采集覆盖 scraper 写入的 homepage 数据 |
+| ~~预筛与采集解耦~~（已废弃） | ~~`--prescreen-dir` 读磁盘~~ | ~~随预筛功能废弃~~ |
 | 详情页文本清洗 | 去 script → 标签转文本 → 去重 → nav关键词 → 短行块 | 各校 HTML 结构差异大，无法用结构选择器统一处理 |
 | Nav 过滤核心策略 | 去重（出现≥2次的行视为 nav） | 各校菜单均为移动端+桌面端双份，去重最通用有效 |
 
 ## 九、已知限制
 
-1. **同名消歧**：author_id 自动发现仅取首个候选，同名时可能匹配错误
+1. ~~**同名消歧**：author_id 自动发现仅取首个候选，同名时可能匹配错误~~（已废弃，随 Scholar 链路移除）
 2. **JS 渲染页面**：清华电子工程系(147人)用 JS 注入数据，无 profile_url，无法抓取详情
 3. **图片邮箱**：北大 CS 用图片拆分 `@` 符号，email 提取率仅 1%；上交 99%、清华 58%
-4. **推荐规则**：规则版（recommendation_assembler）仅简单拼接；LLM 版（match_engine）已落地，但 prompt 质量仍在迭代中
+4. **推荐规则**：~~规则版（recommendation_assembler）仅简单拼接；~~LLM 版（match_engine）已落地并产出多学院 recommendations.json
 5. **增量更新**：无，每次全量抓取
 6. **Nav 噪音**：去重策略对双份菜单有效，但仅出现一次的导航项仍会残留少量
 7. **LLM 成本**：~1500 教师 × ~5k tokens ≈ 15M input tokens，每次全量运行需消耗 API 配额
@@ -285,12 +290,12 @@ Rule(
 │   │   ├── profile_extractor.py        # LLM 教师信息提取
 │   │   ├── match_engine.py             # LLM 匹配推荐
 │   │   └── pipeline.py                 # 端到端 LLM 流水线
-│   ├── teacher_list_collector.py       # 任务0 入口（含 --prescreen-dir 模式）
+│   ├── teacher_list_collector.py       # 任务0 入口
 │   ├── teacher_list_core.py            # 通用提取引擎
 │   ├── teacher_list_models.py          # 数据模型
 │   ├── teacher_list_helpers.py         # 文本工具
 │   ├── teacher_list_io.py              # IO 导出
-│   ├── teacher_list_prescreen.py       # 离线预筛（含 homepage 关键词匹配）
+│   ├── ~~teacher_list_prescreen.py~~   # ~~离线预筛（已废弃）~~
 │   ├── teacher_profile_scraper.py      # 教师详情页抓取（任务0.5）
 │   ├── teacher_extractors/             # 学校特定规则
 │   │   ├── __init__.py                 # 规则注册

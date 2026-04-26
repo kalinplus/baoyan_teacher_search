@@ -1,8 +1,10 @@
 ### 背景
-当前预筛（prescreen）仅基于教师列表页已有字段（name、title、interests、email）做评分，信息粒度粗。例如北大 CS 列表页 interests 仅有 `["计算机网络"]`，但教师主页包含详细研究方向、代表性论文、个人简介等丰富信息。需要先抓取教师学院主页详情，补充结构化字段，再进入预筛打分，将 234 人候选池缩减到合理规模（~50 人）。
+~~当前预筛（prescreen）仅基于教师列表页已有字段（name、title、interests、email）做评分，信息粒度粗。例如北大 CS 列表页 interests 仅有 `["计算机网络"]`，但教师主页包含详细研究方向、代表性论文、个人简介等丰富信息。需要先抓取教师学院主页详情，补充结构化字段，再进入预筛打分，将 234 人候选池缩减到合理规模（~50 人）。~~
+
+> **已废弃**：预筛（prescreen）功能已不再维护。教师主页详情抓取（homepage）完成后，全部候选直接通过 LLM Pipeline 做匹配打分，不再做规则预筛。homepage 字段为 LLM 提供高质量结构化输入。
 
 ### 最终目标
-对 teachers.json 中所有有 profile_url 的教师，抓取学院主页详情页，提取研究方向、个人简介、邮箱、代表工作、外部主页、招生信息，补充回 teachers.json，供后续预筛和 LLM 分析使用。
+对 teachers.json 中所有有 profile_url 的教师，抓取学院主页详情页，提取研究方向、个人简介、邮箱、代表工作、外部主页、招生信息，补充回 teachers.json，供 LLM 分析使用。
 
 ### 分步计划（有序，每步独立可验收）
 
@@ -44,22 +46,26 @@ Step 2: 将抓取结果补充回 teachers.json
   - email 补全逻辑：列表页 email 为 null 且抓取到 email 时，用抓取值覆盖
   - 验收: 输出的 teachers.json 与原格式兼容（仅新增 homepage 字段），原字段不变
 
-Step 3: 预筛评分增加 homepage 关键词匹配
-  - 产出物: 修改 `src/teacher_list_prescreen.py` + `config/prescreen_scoring.json`
-  - 在 scoring config 中新增 `interest_target_keywords` 字段（默认词池：NLP/LLM/CV/ML/深度学习/强化学习/数据挖掘/知识图谱/多模态/信息检索/推荐系统等）
-  - 新增权重 `homepage_keyword_match_bonus`（每命中一个关键词 +3 分）和 `homepage_keyword_match_cap`（上限 15 分）
-  - 匹配范围：`homepage.research_fields` + `homepage.bio` + `interests`（列表页已有）
-  - 验收: 对北大 CS + AI 运行 prescreen，top 50 候选中研究方向匹配度显著高于随机
+~~Step 3: 预筛评分增加 homepage 关键词匹配~~（已废弃）
+  - ~~产出物: 修改 `src/teacher_list_prescreen.py` + `config/prescreen_scoring.json`~~
+  - ~~在 scoring config 中新增 `interest_target_keywords` 字段~~
+  - ~~新增权重 `homepage_keyword_match_bonus` 和 `homepage_keyword_match_cap`~~
+  - ~~匹配范围：`homepage.research_fields` + `homepage.bio` + `interests`~~
+  - ~~验收: 对北大 CS + AI 运行 prescreen~~
+
+> 预筛功能已废弃，homepage 字段直接供 LLM Pipeline 消费，不再做规则打分。
 
 ### 非目标
-- 不写学校特定的 profile 页解析规则（全部用通用启发式）
+- ~~不写学校特定的 profile 页解析规则（全部用通用启发式）~~
+  - **例外 1**：上海交通大学计算机学院（`www.cs.sjtu.edu.cn/jiaoshiml/`）页面结构高度统一（`.js-info` + `.js-dt`），且通用启发式对其效果极差（email 被 footer 污染、bio 大面积为空、title 精度丢失）。已为其增加结构化解析路径，生成高质量 `full_text` 供 LLM 消费。
+  - **例外 2**：清华大学计算机科学与技术系（`www.cs.tsinghua.edu.cn/info/...`）页面使用统一 CMS 模板（`v_news_content`），通用启发式能正确提取关键字段，但 `full_text` 包含约 40% 导航噪音（院系简介、历史沿革等）。已为其增加结构化解析路径，按 `<h4>` / `<strong>` 分节提取内容，将 `full_text` 从 103 行压缩到 ~20 行。
 - 不接入 LLM（后续独立任务）
 - 不改动已有提取器（teacher_extractors/）
 - 不改动 scholar 抓取链路
 - 新增依赖需先确认
 
 ### 参考
-- 现有 prescreen 机制: `src/teacher_list_prescreen.py`, `config/prescreen_scoring.json`
+- ~~现有 prescreen 机制~~（已废弃）: ~~`src/teacher_list_prescreen.py`, `config/prescreen_scoring.json`~~
 - 北大 CS profile 页示例: `https://cs.pku.edu.cn/info/1061/1602.htm`（边凯归）
 - 北大 AI profile 页示例: `https://www.ai.pku.edu.cn/info/1312/1683.htm`（刘家瑛）
 - 清华 AI profile 页示例: `https://collegeai.tsinghua.edu.cn/rydw/qzpi/dongyinpeng.htm`（董胤蓬）
@@ -68,7 +74,7 @@ Step 3: 预筛评分增加 homepage 关键词匹配
 ### 自动化验收命令
 - 运行环境: .venv（项目已有虚拟环境）
 - 执行命令格式: python src/xxx
-- 正确工作流: collector（采集）→ scraper（补充 homepage）→ collector --prescreen-dir（预筛）
+- 正确工作流: collector（采集）→ scraper（补充 homepage）→ ~~collector --prescreen-dir（预筛）~~（已废弃，直接走 LLM Pipeline）
 
 [Step1: 抓取北大教师主页详情]
 ```
@@ -99,24 +105,23 @@ assert has_homepage > 90, f'Success rate too low: {has_homepage}/120'
 "
 ```
 
-[Step3: prescreen 带关键词匹配（使用 --prescreen-dir 读磁盘）]
+~~[Step3: prescreen 带关键词匹配（使用 --prescreen-dir 读磁盘）]~~（已废弃）
 ```
-python src/teacher_list_collector.py --prescreen-dir output/teacher_pool --keywords "自然语言处理,大语言模型,计算机视觉,机器学习" --top-n 10
-python -c "
-import json; d = json.loads(open('output/teacher_pool/北京大学/人工智能研究院/prescreen.json', encoding='utf-8').read())
-print(f'Top candidates: {len(d[\"top_candidates\"])}')
-for c in d['top_candidates'][:5]:
-    print(f'  {c[\"name\"]} score={c[\"score\"]} tier={c[\"tier\"]} kw={c[\"matched_keywords\"]}')
-"
+# 预筛功能已废弃，直接通过 LLM Pipeline 对全部候选打分
+python src/llm/pipeline.py \
+  --input output/teacher_pool/北京大学/人工智能研究院/teachers.json \
+  --resume ./resume.txt \
+  --interests ./interests.txt \
+  --output-dir output/北大AI推荐结果
 ```
 
 ### 成功条件
-- 所有步骤验收命令通过（exit code 0）
+- Step1/Step2 验收命令通过（exit code 0）
 - 全部 16 个学院 1480 位教师抓取成功率 > 80%（实际 homepage 1329/1480 = 89.8%，0 失败）
 - teachers.json 与原格式兼容（原字段不变，新增 homepage 字段，回填 email/title）
 - full_text 中 nav 噪音明显减少（去重 + 关键词过滤 + 短行块过滤）
-- prescreen --prescreen-dir 不重新采集，直接读磁盘做预筛
-- prescreen 分数区分度显著（AI 从 2 种分数扩展到 7+ 种，tier A 候选数 > 50%）
+- ~~prescreen --prescreen-dir 不重新采集，直接读磁盘做预筛~~（已废弃）
+- ~~prescreen 分数区分度显著~~（已废弃，由 LLM 打分替代）
 
 ### 各校抓取统计（2026-04-20）
 

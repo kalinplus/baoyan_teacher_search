@@ -10,23 +10,24 @@
 - 仅在必要时添加注释，注释应解释业务意图而不是逐行复述代码。
 
 ### Architecture
-- 当前唯一运行入口是 src/scholar/scholar_client.py。
-- 通过 ScholarAuthorClient 类调用 SerpApi，主方法是 query_structured_info(author_id)。
+- 主要运行入口：`src/teacher_list_collector.py`（采集）、`src/llm/pipeline.py`（LLM 提取+匹配）。
+- ~~`src/scholar/scholar_client.py`~~（已废弃，Google Scholar 链路不再维护）。
 - 学校归一化配置来自 config/universities.json。
-- 输出目录结构固定为 output/{学校全称}/{老师姓名}/，包含 result.json 和 summary.md。
+- LLM Pipeline 输出目录结构：`output/teacher_pool/{学校}/{学院}/recommendations.json` 与 `html_report/`。
 
 ### Build and Test
 - 安装依赖: pip install -r requirements.txt
-- 运行命令: python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
-- 快速验收: python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text(encoding='utf-8'));print(d.get('name'))"
+- ~~运行命令: python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output~~（已废弃）
+- ~~快速验收: python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text(encoding='utf-8'));print(d.get('name'))"~~（已废弃）
+- 当前推荐运行: python src/llm/pipeline.py --input output/teacher_pool/{学校}/{学院}/teachers.json --resume ./resume.txt --interests ./interests.txt --output-dir output/推荐结果
 - 当前仓库未配置单元测试框架；改动后至少执行一次运行命令和一次输出校验。
 
 ### Conventions
-- 必须提供环境变量 SERPAPI_KEY，否则程序会抛出运行时错误。
+- ~~必须提供环境变量 SERPAPI_KEY~~（已废弃，随 Scholar 链路移除）。
+- 必须提供环境变量 SILICONFLOW_API_KEY（LLM Pipeline 需要）。
 - school 参数必须能在 config/universities.json 中归一化，否则会抛出 ValueError。
-- 默认支持学校+老师自动发现 author_id；也允许显式传入 author_id。
-- 自动发现依赖 SCRAPERAPI_KEY。
-- source 字段应包含 author_id 来源与 scholar_author（例如 google_search,scholar_author）。
+- ~~默认支持学校+老师自动发现 author_id；也允许显式传入 author_id。~~（已废弃）
+- ~~自动发现依赖 SCRAPERAPI_KEY。~~（已废弃）
 
 ### Personal Engineering Preferences
 1. Fail fast and loudly: Do not write fallback logic unless it is explicitly required.
@@ -36,11 +37,9 @@
 ### Docs
 - 项目运行与字段契约: README.md
 - 阶段任务描述: docs/task_descs.md
-- 阶段2进度: docs/stage2/progress.md
-- Step1契约: docs/task1/step1_contract.md
-- 批量闭环后续计划: docs/task1/batch_closed_loop_plan.md
-- 问题归档: docs/archive/stage2_issues.md
-- 技术路线背景: docs/google_scholar_info.md
+- 架构与数据契约: docs/architecture.md
+- ~~阶段2进度~~ / ~~问题归档~~（文件不存在，已清理）
+- ~~Step1契约~~ / ~~批量闭环计划~~ / ~~LLM Pipeline 设计~~ / ~~技术路线背景~~（已归档至 docs/archive/）
 
 ## Approval And Safety Rules
 

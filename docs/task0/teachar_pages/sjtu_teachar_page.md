@@ -11,6 +11,17 @@ URL：https://www.cs.sjtu.edu.cn/jiaoshiml.html
 姓名样本（来自主站 body 快照）：臧斌宇、陈榕、糜泽羽、俞凯、赵涵、胡云聪、郑臻哲、林云、郁昱、张少霆
 限制：直接抓取 `jiaoshiml.html` 初始 HTML 仍可能只拿到壳页面；当前通过调用官方 AJAX 接口 `active/ajax_teacher_list.html` 可稳定获取教师名录，同时保留 `People.aspx` 兜底。
 验证结果：通过（AJAX 接口稳定抽取 19 个研究所、293 位教师；其中 290 位含主页链接，3 位缺少 `href`）
+
+**个人主页结构（已适配结构化解析）**
+- URL 模式：`https://www.cs.sjtu.edu.cn/jiaoshiml/{pinyin}.html`
+- 页面模板统一，分为两个区域：
+  1. `.js-info`：固定字段（姓名 `.name`、职称 `.zw`、邮箱/电话/地址/研究所/个人主页 `.dt p`）
+  2. `.js-dt`：可变区块，以 `.item.item2` 为单位，常见标题有"个人简介"（~90%）、"教育背景"（~30%）、"工作履历"（~20%）
+- `teacher_profile_scraper.py` 已为其增加 `_scrape_sjtu_cs_profile` 结构化解析路径：
+  - 从 `.js-info` 精确提取 email、title、personal_homepage，避免 footer 污染
+  - 从 `.js-dt` 完整提取"个人简介"文本作为 bio，不再截断
+  - 从 bio 中反向解析 research_fields，按边界词截断避免污染
+  - 组装为结构化 `full_text` 供 LLM 消费，LLM 层无需改动
 补充页验证：
 - https://cs.sjtu.edu.cn/cse/People.aspx（HTTP 200；作为接口不稳定时的可用兜底）
 ```

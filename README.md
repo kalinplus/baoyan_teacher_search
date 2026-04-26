@@ -1,11 +1,14 @@
-# 保研导师信息抓取（阶段2：最小可运行）
+# 保研导师信息抓取与推荐（全链路 CLI）
 
-本仓库当前实现了阶段2最小闭环：
+输入学校+学院，批量抓取教师池，经 homepage 详情补充后直接通过 LLM 提取研究方向与招生信息，最终输出匹配度排序的推荐报告（JSON + HTML）。
 
-- 输入学校和老师姓名（可选显式 author_id）
-- 归一化学校名称
-- 自动发现或使用显式 author_id 后拉取老师基础学术信息
-- 标准目录输出 `result.json` 与 `summary.md`
+核心链路：
+
+- **任务0**：教师名单采集（`teacher_list_collector.py`）
+- **任务0.5**：教师主页详情抓取（`teacher_profile_scraper.py`）
+- ~~**任务1**：离线预筛（`teacher_list_prescreen.py`）~~（已废弃，由 LLM Pipeline 替代）
+- **任务3**：LLM 提取 + 匹配推荐（`llm/pipeline.py`）
+- **任务4**：HTML 报告生成（`recommendations_to_html.py`）
 
 ## 运行前准备
 
@@ -17,82 +20,45 @@ pip install -r requirements.txt
 
 2. 配置环境变量（可用 `.env`）
 
-- `SCRAPERAPI_KEY`（自动发现 author_id 时需要）
-- `SERPAPI_KEY`
+- `SILICONFLOW_API_KEY`（LLM 提取与匹配需要）
+- ~~`SCRAPERAPI_KEY`~~ / ~~`SERPAPI_KEY`~~（已废弃，Google Scholar 链路不再维护）
 
 ## CLI 入口
 
-唯一入口脚本：`src/scholar/scholar_client.py`
+主要入口脚本：
 
-执行示例：
+- **批量采集**：`src/teacher_list_collector.py`
+- **LLM 提取 + 匹配**：`src/llm/pipeline.py`
+- ~~**单老师 Scholar 抓取**：`src/scholar/scholar_client.py`~~（已废弃）
 
-```bash
-conda run -n baoyan python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
-```
+---
 
-显式 author_id 模式（可选）：
+## ~~author_id 搜索行为（当前实现）~~（已废弃）
 
-```bash
-conda run -n baoyan python src/scholar/scholar_client.py --school 南大 --teacher 周志华 --author-id rSVIHasAAAAJ --out-dir output
-```
+> Google Scholar 结构化信息抓取已不再维护。预筛后的候选直接通过 LLM Pipeline 完成匹配推荐，无需 author_id 解析。
 
-仅获取 author_id 过程，且开启详细日志（便于排查 author_id 获取过程）：
+~~- 查询模板仅使用一次：`site:scholar.google.com/citations {学校英文缩写} {老师检索词}`。~~
+~~- 学校词仅使用英文缩写（如 `THU`、`PKU`），不再尝试多个学校别名。~~
+~~- 老师输入若包含中文：会使用 `pypinyin` 自动转为“名在前、姓在后”的拼音检索词。~~
+~~- 复姓词表由 `config/compound_surnames.json` 提供，代码运行时读取该配置。~~
+~~- 缓存主键统一为中文姓名：仅中文输入会写入 `author_id_cache.json`。~~
+~~- 命中首候选后执行两层校验（缓存反查冲突 + Scholar 主页姓名一致性）。~~
 
-```bash
-conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output --log-level DEBUG
-```
+---
 
-## 输出路径
+## ~~最小字段契约（`result.json`）~~（已废弃）
 
-默认输出到：
+> 以下字段为 Google Scholar 链路的历史输出，已不再维护。当前核心输出为 `recommendations.json`（LLM Pipeline 产物）。
 
-- `output/{学校全称}/{老师姓名}/result.json`
-- `output/{学校全称}/{老师姓名}/summary.md`
-
-## author_id 搜索行为（当前实现）
-
-- 查询模板仅使用一次：`site:scholar.google.com/citations {学校英文缩写} {老师检索词}`。
-- 学校词仅使用英文缩写（如 `THU`、`PKU`），不再尝试多个学校别名。
-- 老师输入若包含中文：会使用 `pypinyin` 自动转为“名在前、姓在后”的拼音检索词（如 `周志华 -> Zhihua Zhou`、`欧阳娜娜 -> Nana Ouyang`）。
-- 复姓词表由 `config/compound_surnames.json` 提供，代码运行时读取该配置。
-- 老师输入若不包含中文（如直接输入拼音）：会输出 warning，并继续按原输入检索。
-- 缓存主键统一为中文姓名：仅中文输入会写入 `author_id_cache.json`（键格式 `{学校全称}::{中文姓名}`）；非中文输入为避免混合键污染不写缓存。
-- 仅抓取 Google 搜索第 1 页（`start=0`）。
-- 解析网页文本中第一个正则匹配到的 `author_id` 作为最终结果。
-- 候选 `author_id` 最多抓取 1 个（命中首个有效候选后立即停止），不再抓取 10 个。
-- 命中首候选后执行两层校验：
-	- 先做 author_id 反查冲突：若该 author_id 已绑定到其他老师姓名，标记并跳过（`skip_reason=author_id_conflict_existing_teacher`）。
-	- 再做 Scholar 主页姓名校验：若主页姓名与当前检索老师不一致，标记并跳过（`skip_reason=scholar_name_mismatch`）。
-- 仅当两层校验都通过时，才写入缓存并返回结果。
-- 支持 `--log-level` 输出调用链日志，建议排障时使用 `DEBUG`。
-
-## 最小字段契约
-
-`result.json` 包含以下阶段2核心字段：
-
-- `author_id`
-- `name`
-- `affiliations`
-- `email`
-- `interests`
-- `citations_all`
-- `citations_last_1y`
-- `citations_last_3y`
-- `citations_last_5y`
-- `publications_total`
-- `publications_last_1y`
-- `publications_last_3y`
-- `publications_last_5y`
-- `publications_truncated`
-- `h_index_all`
-- `i10_index_all`
-- `source`
-- `matched_school`
-- `matched_teacher`
-
-附加字段：
-
-- `publications_truncated=true` 表示当前发文统计可能被单次抓取窗口截断（存在下一页）；`false` 表示当前请求未检测到下一页
+~~- `author_id`~~
+~~- `name`~~
+~~- `affiliations`~~
+~~- `email`~~
+~~- `interests`~~
+~~- `citations_all` / `citations_last_*`~~
+~~- `publications_total` / `publications_last_*`~~
+~~- `h_index_all` / `i10_index_all`~~
+~~- `source` / `matched_school` / `matched_teacher`~~
 
 ## 任务0 Step2（规则驱动教师名单抓取）
 
@@ -128,7 +94,7 @@ conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --t
 - 上海交通大学 计算机学院（网络空间安全学院、密码学院）：293
 - 上海交通大学 浦江国际学院（原密西根学院）：65
 - 上海交通大学 溥渊未来技术学院：64
-- 清华大学 计算机科学与技术系：191
+- 清华大学 计算机科学与技术系：127
 - 清华大学 软件学院：41
 - 清华大学 人工智能学院：13
 - 清华大学 交叉信息研究院：75
@@ -150,65 +116,46 @@ conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/sour
 
 - `output/teacher_pool/{学校}/{学院}/teachers.json`
 
-可选导出任务1批量输入：
+可选导出 JSONL：
 
 ```bash
 conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --export-jsonl output/teacher_pool/all_teachers.jsonl
 ```
 
-离线预筛（任务1前置控量）：
+---
 
-```bash
-conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --prescreen --top-n 20 --budget 20 --keywords 机器学习,计算机视觉 --negative-keywords 艺术,设计,传媒
-```
+## ~~离线预筛（任务1前置控量）~~（已废弃）
 
-预筛参数说明：
+> 预筛功能已由 LLM Pipeline 替代。全部候选直接输入 LLM 做提取与匹配打分，不再做规则预筛、A/B/C 分层和 budget 裁剪。
 
-- `--prescreen`：开启离线预筛。
-- `--top-n`：进入下一阶段的目标候选数。
-- `--budget`：实际预算上限（最终候选数为 `min(top_n, budget)`）。
-- `--keywords`：方向关键词（逗号分隔），用于兴趣匹配加分。
-- `--negative-keywords`：负向兴趣关键词（逗号分隔），命中后按配置扣分。
-- `--contacted-list`：已联系名单配置路径（默认 `config/contacted_teachers.json`）。
+~~```bash~~
+~~conda run -n baoyan python src/teacher_list_collector.py --input docs/task0/source_urls.json --school 上海交通大学 --college 人工智能学院 --out-dir output/teacher_pool --prescreen --top-n 20 --budget 20 --keywords 机器学习,计算机视觉 --negative-keywords 艺术,设计,传媒~~
+~~```~~
 
-预筛打分规则配置：
+~~预筛参数说明：~~
 
-- `config/prescreen_scoring.json`：离线预筛的可调参数文件。
-- 可直接调整负向信号关键词、负向兴趣关键词、证据字段、职称关键词、各项加减分权重与 A/B/C 阈值，无需改动代码。
-- 关键词匹配采用整词匹配：纯 ASCII 关键词使用 `\b` 词边界，中文/混合关键词使用前后非字母数字边界，避免子串误命中（如 `"AI"` 不会匹配 `"FAIL"`）。
-- 若兴趣字段非空，但既未命中任何正向关键词，也未命中任何负向关键词，则施加轻微中性惩罚（默认 `-1`），防止方向过多、撞库式 broad match 获得虚高分数。
+~~- `--prescreen`：开启离线预筛。~~
+~~- `--top-n`：进入下一阶段的目标候选数。~~
+~~- `--budget`：实际预算上限。~~
+~~- `--keywords`：方向关键词。~~
+~~- `--negative-keywords`：负向兴趣关键词。~~
+~~- `--contacted-list`：已联系名单配置路径。~~
 
-开启预筛后会额外输出：
+~~预筛打分规则配置：~~
 
-- `output/teacher_pool/{学校}/{学院}/prescreen.json`
+~~- `config/prescreen_scoring.json`：离线预筛的可调参数文件。~~
 
-`prescreen.json` 关键字段：
+---
 
-- `top_candidates`：按分数排序且通过预算裁剪后的候选（用于后续 Scholar 抓取）。
-- `candidates`：所有未被硬跳过的评分结果（含 `score/tier/reasons`）。
-- `skipped`：被跳过条目（`skip_reason` 包含 `already_contacted`、`negative_signal_evidence`、`over_budget`）。
-- `stats`：总量、分层分布与各类跳过统计。
+## ~~任务1批量闭环（prescreen Top N -> author_id -> scholar -> recommendation）~~（已废弃）
 
-任务1批量闭环（prescreen Top N -> author_id -> scholar -> recommendation）：
+> 随 Google Scholar 链路废弃。预筛后的候选直接通过 LLM Pipeline 完成匹配推荐。
 
-```bash
-conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --college 计算机科学与技术系 --pool-dir output/teacher_pool --out-dir output
-```
+~~```bash~~
+~~conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --college 计算机科学与技术系 --pool-dir output/teacher_pool --out-dir output~~
+~~```~~
 
-批量闭环输入：
-
-- `output/teacher_pool/{学校}/{学院}/teachers.json`
-- `output/teacher_pool/{学校}/{学院}/prescreen.json`
-
-批量闭环输出：
-
-- `output/{学校}/{学院}/final_recommendations.json`
-
-`final_recommendations.json` 关键字段：
-
-- 顶层字段：`school`、`college`、`generated_at`、`total_candidates`、`resolved_candidates`、`failed_candidates`、`failed_candidate_details`、`recommendations`
-- `failed_candidate_details`：失败老师维度明细，当前包含消歧阶段 skip 原因（`author_id_conflict_existing_teacher`、`scholar_name_mismatch`）
-- `recommendations` 单项字段：`teacher`、`prescreen_score`、`prescreen_tier`、`prescreen_reasons`、`author_id`、`author_id_source`、`scholar_metrics`、`recommendation_reason`、`risk_flags`
+~~批量闭环输出 `final_recommendations.json` 已不再维护。~~
 
 ## LLM Pipeline（任务3：匹配推荐）
 
@@ -218,8 +165,8 @@ conda run -n baoyan python src/batch_closed_loop.py --school 清华大学 --coll
 # 端到端流水线（提取 + 匹配）
 conda run -n baoyan python src/llm/pipeline.py \
   --input output/teacher_pool/上海交通大学/人工智能学院/teachers.json \
-  --resume docs/resume.txt \
-  --interests docs/interests.txt \
+  --resume ./resume.txt \
+  --interests ./interests.txt \
   --output-dir output/上交AI推荐结果
 ```
 
@@ -234,8 +181,8 @@ conda run -n baoyan python src/llm/profile_extractor.py \
 # Step2: LLM 匹配推荐
 conda run -n baoyan python src/llm/match_engine.py \
   --input output/上交AI推荐结果/llm_enriched.json \
-  --resume docs/resume.txt \
-  --interests docs/interests.txt \
+  --resume ./resume.txt \
+  --interests ./interests.txt \
   --output output/上交AI推荐结果/recommendations.json
 ```
 
@@ -262,31 +209,31 @@ python recommendations_to_html.py -i "output/上交AI推荐结果"
 
 ## 自动化验收命令
 
-- Step1
+- 教师名单采集
 
 ```bash
-conda run -n baoyan python -c "print('contract-reviewed')"
+conda run -n baoyan python src/teacher_list_collector.py \
+  --input docs/task0/source_urls.json \
+  --school 上海交通大学 --college 人工智能学院 \
+  --out-dir output/teacher_pool
 ```
 
-- Step2
+- ~~预筛~~（已废弃，由 LLM Pipeline 替代）
 
 ```bash
-conda run -n baoyan python src/scholar/author_id_resolver.py --school 清华 --teacher 夏树涛 --out-dir output
+# 直接走 LLM Pipeline，不对候选池做规则预筛
+conda run -n baoyan python src/llm/pipeline.py \
+  --input output/teacher_pool/上海交通大学/人工智能学院/teachers.json \
+  --resume ./resume.txt \
+  --interests ./interests.txt \
+  --output-dir output/上交AI推荐结果
 ```
 
-- Step3
-
-```bash
-conda run -n baoyan python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
-conda run -n baoyan python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text());print(d.get('name'))"
-```
+- ~~Step2~~ / ~~Step3~~（已废弃，Google Scholar 链路不再维护）
 
 ## 阶段文档索引
 
 - 任务描述与阶段进度: docs/task_descs.md
 - 架构与数据契约: docs/architecture.md
-- Step1契约: docs/task1/step1_contract.md
-- 批量闭环计划: docs/task1/batch_closed_loop_plan.md
-- LLM Pipeline 设计: docs/llm_pipeline_design.md
-- 问题归档: docs/archive/stage2_issues.md
+- ~~Step1契约~~ / ~~批量闭环计划~~ / ~~LLM Pipeline 设计~~（已归档至 docs/archive/）
 
