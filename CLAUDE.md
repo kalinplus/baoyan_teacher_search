@@ -16,8 +16,9 @@
 - 输出目录结构固定为 output/{学校全称}/{老师姓名}/，包含 result.json 和 summary.md。
 
 ### Build and Test
-- 安装依赖: pip install -r requirements.txt
-- 运行命令: python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
+- Conda 环境：项目使用专用 conda 环境 `baoyan`（Python 3.12），所有脚本必须通过 `PYTHONPATH=src conda run -n baoyan python src/...` 执行，禁止使用 base 环境或裸 `python` 调用。
+- 安装依赖: `conda run -n baoyan pip install -r requirements.txt`
+- 运行命令: PYTHONPATH=src conda run -n baoyan python src/scholar/scholar_client.py --school 清华 --teacher 夏树涛 --out-dir output
 - 快速验收: python -c "import json,pathlib;p=pathlib.Path('output/清华大学/夏树涛/result.json');d=json.loads(p.read_text(encoding='utf-8'));print(d.get('name'))"
 - 当前仓库未配置单元测试框架；改动后至少执行一次运行命令和一次输出校验。
 

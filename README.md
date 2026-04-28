@@ -12,13 +12,20 @@
 
 ## 运行前准备
 
-1. 安装依赖
+1. 激活项目 conda 环境（所有脚本必须在此环境下运行，不要使用 base 环境）
+
+```bash
+conda activate baoyan
+export PYTHONPATH=src
+```
+
+2. 安装依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-2. 配置环境变量（可用 `.env`）
+3. 配置环境变量（可用 `.env`）
 
 - `SILICONFLOW_API_KEY`（LLM 提取与匹配需要）
 - ~~`SCRAPERAPI_KEY`~~ / ~~`SERPAPI_KEY`~~（已废弃，Google Scholar 链路不再维护）
@@ -83,6 +90,7 @@ pip install -r requirements.txt
 - 浙江大学 计算机科学与技术学院：教师名录页自动提取 `name/profile_url/email/title`
 - 浙江大学 软件学院：教师名录页自动提取 `name/profile_url/email/title`
 - 上海创智学院 学院导师：AJAX POST `/_wp3services/generalQuery` API 获取教师 JSON，提取 `name/profile_url/title/interests`
+- 中国人民大学 高瓴人工智能学院：`.tutor.media` 卡片内 `<h2><a>` 提取 `name/profile_url/title`
 
 关键词白名单配置：
 
@@ -105,6 +113,7 @@ pip install -r requirements.txt
 - 浙江大学 计算机科学与技术学院：~73
 - 浙江大学 软件学院：~98
 - 上海创智学院 学院导师：73
+- 中国人民大学 高瓴人工智能学院：26
 
 执行示例：
 
