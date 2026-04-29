@@ -319,7 +319,10 @@ def main():
         input_dirs = [Path(args.input)]
     else:
         output_dir = repo_root / "output"
-        input_dirs = sorted([p for p in output_dir.iterdir() if p.is_dir() and (p / "recommendations.json").exists()])
+        input_dirs = sorted({
+            p.parent for p in output_dir.rglob("recommendations.json")
+            if "recommendations" in str(p.relative_to(output_dir)) or "teacher_pool" in str(p.relative_to(output_dir))
+        })
 
     groups = []
     for d in input_dirs:
