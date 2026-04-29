@@ -427,31 +427,3 @@ def looks_like_profile_url(profile_url: Optional[str]) -> bool:
     return any(keyword in lowered for keyword in PROFILE_URL_PERSON_KEYWORDS)
 
 
-def profile_quality(profiles: List[TeacherProfile]) -> float:
-    if not profiles:
-        return 0.0
-
-    total = len(profiles)
-    with_url = sum(1 for item in profiles if item.profile_url)
-    with_rich = sum(1 for item in profiles if item.email or item.interests or item.title)
-    with_person_url = sum(1 for item in profiles if looks_like_profile_url(item.profile_url))
-    return 0.5 * (with_url / total) + 0.2 * (with_rich / total) + 0.3 * (with_person_url / total)
-
-
-def should_use_fallback(auto_profiles: List[TeacherProfile], fallback_profiles: List[TeacherProfile]) -> bool:
-    if not fallback_profiles:
-        return False
-    if not auto_profiles:
-        return True
-
-    auto_quality = profile_quality(auto_profiles)
-    fallback_quality = profile_quality(fallback_profiles)
-    if fallback_quality > auto_quality:
-        return True
-
-    if len(fallback_profiles) > len(auto_profiles):
-        return True
-
-    auto_richness = sum(profile_richness(item) for item in auto_profiles)
-    fallback_richness = sum(profile_richness(item) for item in fallback_profiles)
-    return fallback_richness > auto_richness

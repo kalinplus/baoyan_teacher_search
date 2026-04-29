@@ -10,7 +10,6 @@ from teacher_list_helpers import (
     extract_name_from_anchor_text,
     extract_teacher_profiles_auto,
     profile_to_dict,
-    should_use_fallback,
 )
 from teacher_list_models import Rule, SourceRecord, TeacherProfile
 
@@ -83,17 +82,15 @@ def collect_teachers(record: SourceRecord, timeout: int, rules: List[Rule], logg
     logger.info("Collecting teachers for school=%s college=%s", record.school, record.college)
     html = fetch_html(record.url, timeout=timeout)
 
-    auto_profiles = clean_teacher_profiles(extract_teacher_profiles_auto(html, source_url=record.url), source_url=record.url)
-    selected_profiles = auto_profiles
-    selected_mode = "auto"
-
     rule = find_rule(record.url, rules)
     if rule:
-        fallback_candidates = collect_profiles_with_rule(rule, html, source_url=record.url)
-        fallback_profiles = clean_teacher_profiles(fallback_candidates, source_url=record.url)
-        if should_use_fallback(auto_profiles, fallback_profiles):
-            selected_profiles = fallback_profiles
-            selected_mode = f"fallback:{rule.name}"
+        rule_candidates = collect_profiles_with_rule(rule, html, source_url=record.url)
+        selected_profiles = clean_teacher_profiles(rule_candidates, source_url=record.url)
+        selected_mode = f"fallback:{rule.name}"
+    else:
+        auto_profiles = extract_teacher_profiles_auto(html, source_url=record.url)
+        selected_profiles = clean_teacher_profiles(auto_profiles, source_url=record.url)
+        selected_mode = "auto"
 
     validate_teacher_profiles(selected_profiles, record)
     teachers = [profile.name for profile in selected_profiles]
