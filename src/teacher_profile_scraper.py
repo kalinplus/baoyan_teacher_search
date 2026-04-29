@@ -107,9 +107,28 @@ CHINESE_NAME_PATTERN = re.compile(r"^[\u4e00-\u9fff]{2,4}$")
 # HTML → text
 # ---------------------------------------------------------------------------
 
+def _fetch_html_with_weak_ssl(url: str, timeout: int = 30) -> str:
+    import ssl
+
+    import urllib3
+
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    ctx.set_ciphers("ALL:@SECLEVEL=0")
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+    http = urllib3.PoolManager(ssl_context=ctx)
+    resp = http.request("GET", url, timeout=timeout)
+    return resp.data.decode("utf-8", errors="replace")
+
+
 def fetch_html(url: str, timeout: int = 30) -> str:
-    resp = requests.get(url, timeout=timeout)
-    resp.raise_for_status()
+    try:
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+    except requests.exceptions.SSLError:
+        return _fetch_html_with_weak_ssl(url, timeout=timeout)
+
     if not resp.encoding or resp.encoding.lower() == "iso-8859-1":
         resp.encoding = resp.apparent_encoding
     return resp.text
@@ -672,6 +691,147 @@ def _scrape_generic_profile(text: str) -> Dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
+# NJU IS structured profile scrape
+# ---------------------------------------------------------------------------
+
+NJU_PROFILE_URL_PATTERN = re.compile(r"https?://is\.nju\.edu\.cn/\w+/main\.htm")
+
+
+def _extract_nju_personinfo(html: str) -> Dict[str, Optional[str]]:
+    result: Dict[str, Optional[str]] = {"name": None, "email": None, "office": None}
+    start = html.find('<div class="personinfo')
+    if start == -1:
+        return result
+    # Find the matching closing tag by depth tracking
+    tag_start = html.find(">", start)
+    if tag_start == -1:
+        return result
+    tag_start += 1
+    depth = 1
+    pos = tag_start
+    while pos < len(html) and depth > 0:
+        next_open = html.find('<div', pos)
+        next_close = html.find('</div>', pos)
+        if next_close == -1:
+            break
+        if next_open != -1 and next_open < next_close:
+            depth += 1
+            pos = next_open + 4
+        else:
+            depth -= 1
+            pos = next_close + 6
+    info_html = html[start:pos]
+
+    m = re.search(r'<div class="name">(.*?)</div>', info_html)
+    if m:
+        result["name"] = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+
+    for zd_match in re.finditer(r'<div class="zd">(.*?)</div>', info_html):
+        zd_text = re.sub(r"<[^>]+>", "", zd_match.group(1)).strip()
+        if "邮件" in zd_text or "E-mail" in zd_text or "Email" in zd_text:
+            email_match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", zd_text)
+            if email_match:
+                result["email"] = email_match.group(0).lower()
+        elif "办公" in zd_text or "Office" in zd_text:
+            result["office"] = zd_text.split("：", 1)[-1].strip() if "：" in zd_text else ""
+
+    return result
+
+
+def _extract_nju_cn_con(html: str) -> str:
+    """Extract Chinese bio content from the .con section inside .wrapper.cn."""
+    cn_start = html.find('<div class="wrapper cn"')
+    if cn_start == -1:
+        cn_start = 0
+    cn_html = html[cn_start:]
+
+    # Find 个人简历 heading then the .con block that follows
+    heading_match = re.search(
+        r'<div class="name">\s*个人简历\s*</div>\s*<div class="con">',
+        cn_html,
+        re.IGNORECASE,
+    )
+    if not heading_match:
+        return ""
+
+    start = heading_match.end()
+    depth = 1
+    pos = start
+    while pos < len(cn_html) and depth > 0:
+        next_open = cn_html.find('<div', pos)
+        next_close = cn_html.find('</div>', pos)
+        if next_close == -1:
+            break
+        if next_open != -1 and next_open < next_close:
+            depth += 1
+            pos = next_open + 4
+        else:
+            depth -= 1
+            pos = next_close + 6
+
+    con_html = cn_html[start : pos - 6]
+    text = re.sub(r"<[^>]+>", "\n", con_html)
+    text = unescape(text)
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    return "\n".join(lines)
+
+
+def _scrape_nju_profile(html: str, url: str) -> Dict[str, object]:
+    info = _extract_nju_personinfo(html)
+    con_text = _extract_nju_cn_con(html)
+
+    lines: list[str] = []
+    if info.get("name"):
+        lines.append(f"姓名：{info['name']}")
+    if info.get("email"):
+        lines.append(f"邮箱：{info['email']}")
+    if info.get("office"):
+        lines.append(f"办公地点：{info['office']}")
+
+    if con_text:
+        lines.append("")
+        lines.append("个人简历：")
+        lines.append(con_text)
+
+    full_text = "\n".join(lines)
+
+    # Extract research fields from bio
+    research_fields: list[str] = []
+    patterns = [
+        re.compile(r"主要从事\s*([^。\n]+)"),
+        re.compile(r"研究方向为\s*([^。\n]+)"),
+        re.compile(r"研究方向\s*[：:]\s*([^。\n]+)"),
+        re.compile(r"研究领域为\s*([^。\n]+)"),
+        re.compile(r"研究领域\s*[：:]\s*([^。\n]+)"),
+    ]
+    for pat in patterns:
+        m = pat.search(con_text)
+        if m:
+            raw = m.group(1).strip()
+            parts = re.split(r"[、,，;；/|]+", raw)
+            for part in parts:
+                part = part.strip()
+                if 2 <= len(part) <= 40:
+                    research_fields.append(part)
+            if research_fields:
+                break
+
+    conferences = list(dict.fromkeys(CONFERENCE_PATTERN.findall(full_text)))
+
+    return {
+        "full_text": full_text,
+        "research_fields": research_fields if research_fields else None,
+        "bio": con_text[:800] if con_text else None,
+        "email": info.get("email"),
+        "title": None,
+        "representative_works": None,
+        "personal_homepage": None,
+        "recruiting_status": extract_recruiting_status(full_text),
+        "conferences": conferences if conferences else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Single profile scrape
 # ---------------------------------------------------------------------------
 
@@ -683,6 +843,9 @@ def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
 
     if THU_CS_PROFILE_URL_PATTERN.match(url):
         return _scrape_thu_cs_profile(html, url)
+
+    if NJU_PROFILE_URL_PATTERN.match(url):
+        return _scrape_nju_profile(html, url)
 
     text = clean_text(html_to_text(html))
     return _scrape_generic_profile(text)
