@@ -222,23 +222,24 @@ def extract_thu_au_bdmd_names(html: str) -> List[str]:
     return [strip_html_tags(unescape(name)).strip() for name in candidates]
 
 
-def extract_thu_au_bdmd_profiles(html: str, source_url: str) -> List[TeacherProfile]:
-    li_pattern = re.compile(r"<li\b[^>]*>(.*?)</li>", re.IGNORECASE | re.DOTALL)
-    a_pattern = re.compile(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>.*?</a>', re.IGNORECASE | re.DOTALL)
-    h4_pattern = re.compile(r'<h4[^>]*class=["\']h4s1["\'][^>]*>(.*?)</h4>', re.IGNORECASE | re.DOTALL)
-    title_pattern = re.compile(r"(?:讲席教授|助理教授|副教授|教授|副研究员|研究员|工程师|长聘副教授|长聘教授|院长助理|博士后)")
+_THU_AU_BDMD_LI_PATTERN = re.compile(r"<li\b[^>]*>(.*?)</li>", re.IGNORECASE | re.DOTALL)
+_THU_AU_BDMD_A_PATTERN = re.compile(r'<a[^>]*href=["\']([^"\']+)["\'][^>]*>.*?</a>', re.IGNORECASE | re.DOTALL)
+_THU_AU_BDMD_H4_PATTERN = re.compile(r'<h4[^>]*class=["\']h4s1["\'][^>]*>(.*?)</h4>', re.IGNORECASE | re.DOTALL)
+_THU_AU_BDMD_TITLE_PATTERN = re.compile(r"(?:讲席教授|助理教授|副教授|教授|副研究员|研究员|工程师|长聘副教授|长聘教授|院长助理|博士后)")
 
+
+def extract_thu_au_bdmd_profiles(html: str, source_url: str) -> List[TeacherProfile]:
     profiles: List[TeacherProfile] = []
-    for li_html in li_pattern.findall(html):
-        a_match = a_pattern.search(li_html)
-        h4_match = h4_pattern.search(li_html)
+    for li_html in _THU_AU_BDMD_LI_PATTERN.findall(html):
+        a_match = _THU_AU_BDMD_A_PATTERN.search(li_html)
+        h4_match = _THU_AU_BDMD_H4_PATTERN.search(li_html)
         if not a_match or not h4_match:
             continue
         name = strip_html_tags(unescape(h4_match.group(1))).strip()
         if not name:
             continue
         profile_url = absolutize_url(a_match.group(1), source_url)
-        title_match = title_pattern.search(li_html)
+        title_match = _THU_AU_BDMD_TITLE_PATTERN.search(li_html)
         title = title_match.group(0) if title_match else "教授"
         profiles.append(
             TeacherProfile(

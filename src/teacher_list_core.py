@@ -9,6 +9,7 @@ from teacher_list_helpers import (
     clean_teacher_profiles,
     extract_name_from_anchor_text,
     extract_teacher_profiles_auto,
+    fetch_html_with_weak_ssl,
     profile_to_dict,
 )
 from teacher_list_models import Rule, SourceRecord, TeacherProfile
@@ -17,27 +18,12 @@ from teacher_list_models import Rule, SourceRecord, TeacherProfile
 DEFAULT_HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
 
 
-def _fetch_html_with_weak_ssl(url: str, timeout: int) -> str:
-    import ssl
-
-    import urllib3
-
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    ctx.set_ciphers("ALL:@SECLEVEL=0")
-    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-    http = urllib3.PoolManager(ssl_context=ctx)
-    resp = http.request("GET", url, headers=DEFAULT_HEADERS, timeout=timeout)
-    return resp.data.decode("utf-8", errors="replace")
-
-
 def fetch_html(url: str, timeout: int) -> str:
     try:
         response = requests.get(url, headers=DEFAULT_HEADERS, timeout=timeout)
         response.raise_for_status()
     except requests.exceptions.SSLError:
-        return _fetch_html_with_weak_ssl(url, timeout=timeout)
+        return fetch_html_with_weak_ssl(url, timeout=timeout, headers=DEFAULT_HEADERS)
 
     if not response.encoding or response.encoding.lower() == "iso-8859-1":
         response.encoding = response.apparent_encoding

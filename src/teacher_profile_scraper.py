@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 
 import requests
 
+from teacher_list_helpers import fetch_html_with_weak_ssl, strip_html_tags
 from utils import configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -107,27 +108,12 @@ CHINESE_NAME_PATTERN = re.compile(r"^[\u4e00-\u9fff]{2,4}$")
 # HTML → text
 # ---------------------------------------------------------------------------
 
-def _fetch_html_with_weak_ssl(url: str, timeout: int = 30) -> str:
-    import ssl
-
-    import urllib3
-
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    ctx.set_ciphers("ALL:@SECLEVEL=0")
-    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-    http = urllib3.PoolManager(ssl_context=ctx)
-    resp = http.request("GET", url, timeout=timeout)
-    return resp.data.decode("utf-8", errors="replace")
-
-
 def fetch_html(url: str, timeout: int = 30) -> str:
     try:
         resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
     except requests.exceptions.SSLError:
-        return _fetch_html_with_weak_ssl(url, timeout=timeout)
+        return fetch_html_with_weak_ssl(url, timeout=timeout)
 
     if not resp.encoding or resp.encoding.lower() == "iso-8859-1":
         resp.encoding = resp.apparent_encoding
@@ -697,37 +683,45 @@ def _scrape_generic_profile(text: str) -> Dict[str, object]:
 NJU_PROFILE_URL_PATTERN = re.compile(r"https?://is\.nju\.edu\.cn/\w+/main\.htm")
 
 
+def _find_matching_close_tag(html: str, open_idx: int, tag: str = "div") -> int:
+    """Return the index just after the matching closing </tag> starting from open_idx (inside the opening tag)."""
+    tag_start = html.find(">", open_idx)
+    if tag_start == -1:
+        return -1
+    depth = 1
+    pos = tag_start + 1
+    open_pat = f"<{tag}"
+    close_pat = f"</{tag}>"
+    while pos < len(html) and depth > 0:
+        next_open = html.find(open_pat, pos)
+        next_close = html.find(close_pat, pos)
+        if next_close == -1:
+            return -1
+        if next_open != -1 and next_open < next_close:
+            depth += 1
+            pos = next_open + len(open_pat)
+        else:
+            depth -= 1
+            pos = next_close + len(close_pat)
+    return pos
+
+
 def _extract_nju_personinfo(html: str) -> Dict[str, Optional[str]]:
     result: Dict[str, Optional[str]] = {"name": None, "email": None, "office": None}
     start = html.find('<div class="personinfo')
     if start == -1:
         return result
-    # Find the matching closing tag by depth tracking
-    tag_start = html.find(">", start)
-    if tag_start == -1:
+    end = _find_matching_close_tag(html, start, "div")
+    if end == -1:
         return result
-    tag_start += 1
-    depth = 1
-    pos = tag_start
-    while pos < len(html) and depth > 0:
-        next_open = html.find('<div', pos)
-        next_close = html.find('</div>', pos)
-        if next_close == -1:
-            break
-        if next_open != -1 and next_open < next_close:
-            depth += 1
-            pos = next_open + 4
-        else:
-            depth -= 1
-            pos = next_close + 6
-    info_html = html[start:pos]
+    info_html = html[start:end]
 
     m = re.search(r'<div class="name">(.*?)</div>', info_html)
     if m:
-        result["name"] = re.sub(r"<[^>]+>", "", m.group(1)).strip()
+        result["name"] = strip_html_tags(m.group(1)).strip()
 
     for zd_match in re.finditer(r'<div class="zd">(.*?)</div>', info_html):
-        zd_text = re.sub(r"<[^>]+>", "", zd_match.group(1)).strip()
+        zd_text = strip_html_tags(zd_match.group(1)).strip()
         if "邮件" in zd_text or "E-mail" in zd_text or "Email" in zd_text:
             email_match = re.search(r"[\w.+-]+@[\w.-]+\.\w+", zd_text)
             if email_match:
@@ -745,7 +739,6 @@ def _extract_nju_cn_con(html: str) -> str:
         cn_start = 0
     cn_html = html[cn_start:]
 
-    # Find 个人简历 heading then the .con block that follows
     heading_match = re.search(
         r'<div class="name">\s*个人简历\s*</div>\s*<div class="con">',
         cn_html,
@@ -754,26 +747,24 @@ def _extract_nju_cn_con(html: str) -> str:
     if not heading_match:
         return ""
 
-    start = heading_match.end()
-    depth = 1
-    pos = start
-    while pos < len(cn_html) and depth > 0:
-        next_open = cn_html.find('<div', pos)
-        next_close = cn_html.find('</div>', pos)
-        if next_close == -1:
-            break
-        if next_open != -1 and next_open < next_close:
-            depth += 1
-            pos = next_open + 4
-        else:
-            depth -= 1
-            pos = next_close + 6
+    end = _find_matching_close_tag(cn_html, heading_match.end() - len('<div class="con">'), "div")
+    if end == -1:
+        return ""
 
-    con_html = cn_html[start : pos - 6]
+    con_html = cn_html[heading_match.end():end - len('</div>')]
     text = re.sub(r"<[^>]+>", "\n", con_html)
     text = unescape(text)
     lines = [line.strip() for line in text.split("\n") if line.strip()]
     return "\n".join(lines)
+
+
+_NJU_RESEARCH_FIELD_PATTERNS = [
+    re.compile(r"主要从事\s*([^。\n]+)"),
+    re.compile(r"研究方向为\s*([^。\n]+)"),
+    re.compile(r"研究方向\s*[：:]\s*([^。\n]+)"),
+    re.compile(r"研究领域为\s*([^。\n]+)"),
+    re.compile(r"研究领域\s*[：:]\s*([^。\n]+)"),
+]
 
 
 def _scrape_nju_profile(html: str, url: str) -> Dict[str, object]:
@@ -795,16 +786,8 @@ def _scrape_nju_profile(html: str, url: str) -> Dict[str, object]:
 
     full_text = "\n".join(lines)
 
-    # Extract research fields from bio
     research_fields: list[str] = []
-    patterns = [
-        re.compile(r"主要从事\s*([^。\n]+)"),
-        re.compile(r"研究方向为\s*([^。\n]+)"),
-        re.compile(r"研究方向\s*[：:]\s*([^。\n]+)"),
-        re.compile(r"研究领域为\s*([^。\n]+)"),
-        re.compile(r"研究领域\s*[：:]\s*([^。\n]+)"),
-    ]
-    for pat in patterns:
+    for pat in _NJU_RESEARCH_FIELD_PATTERNS:
         m = pat.search(con_text)
         if m:
             raw = m.group(1).strip()

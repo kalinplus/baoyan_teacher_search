@@ -1,27 +1,20 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import List
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urlencode
 
-import ssl
-import urllib3
-
+from teacher_list_helpers import (
+    CHINESE_NAME_PATTERN,
+    INTEREST_SPLIT_PATTERN,
+    absolutize_url,
+    create_weak_ssl_pool_manager,
+    normalize_spaces,
+)
 from teacher_list_models import Rule, TeacherProfile
 
 NJU_API_URL = "https://is.nju.edu.cn/_wp3services/generalQuery?queryObj=teacherHome"
 NJU_SITE_ID = "786"
-
-
-def _create_nju_http() -> urllib3.PoolManager:
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
-    ctx.set_ciphers("ALL:@SECLEVEL=0")
-    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
-    return urllib3.PoolManager(ssl_context=ctx)
-
 
 NJU_RETURN_INFOS = json.dumps([
     {"field": "title", "name": "title"},
@@ -63,8 +56,7 @@ NJU_PAYLOAD = {
     "level": "1",
 }
 
-CHINESE_NAME_PATTERN = re.compile(r"^[一-鿿]{2,4}$")
-INTEREST_SPLIT_PATTERN = re.compile(r"[、,，;；/|\\]+")
+_NJU_HTTP = create_weak_ssl_pool_manager()
 
 
 def supports_nju_is(url: str) -> bool:
@@ -72,8 +64,7 @@ def supports_nju_is(url: str) -> bool:
 
 
 def _fetch_nju_api(timeout: int = 30) -> list:
-    http = _create_nju_http()
-    resp = http.request(
+    resp = _NJU_HTTP.request(
         "POST",
         NJU_API_URL,
         body=urlencode(NJU_PAYLOAD).encode("utf-8"),
@@ -87,7 +78,7 @@ def _split_interests(value: str) -> List[str]:
     interests: List[str] = []
     seen: set[str] = set()
     for chunk in INTEREST_SPLIT_PATTERN.split(value):
-        item = re.sub(r"\s+", " ", chunk).strip()
+        item = normalize_spaces(chunk)
         if not item or item in seen:
             continue
         if len(item) < 2 or len(item) > 40:
@@ -111,7 +102,7 @@ def extract_nju_profiles(html: str, source_url: str) -> List[TeacherProfile]:
         seen_names.add(name)
 
         raw_url = item.get("cnUrl", "")
-        profile_url = urljoin(source_url, raw_url) if raw_url else None
+        profile_url = absolutize_url(raw_url, source_url)
 
         title = item.get("exField2", "").strip() or None
         interests_raw = item.get("exField1", "").strip()

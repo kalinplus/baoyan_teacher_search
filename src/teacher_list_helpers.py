@@ -427,3 +427,20 @@ def looks_like_profile_url(profile_url: Optional[str]) -> bool:
     return any(keyword in lowered for keyword in PROFILE_URL_PERSON_KEYWORDS)
 
 
+def create_weak_ssl_pool_manager() -> object:
+    import ssl
+    import urllib3
+
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    ctx.set_ciphers("ALL:@SECLEVEL=0")
+    ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+    return urllib3.PoolManager(ssl_context=ctx)
+
+
+def fetch_html_with_weak_ssl(url: str, timeout: int, headers: Optional[Dict[str, str]] = None) -> str:
+    http = create_weak_ssl_pool_manager()
+    resp = http.request("GET", url, headers=headers, timeout=timeout)
+    return resp.data.decode("utf-8", errors="replace")
+
