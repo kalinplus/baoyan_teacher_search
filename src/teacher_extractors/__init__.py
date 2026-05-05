@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from teacher_list_models import Rule
+from . import casia
 from . import fdu
 from . import nju
 from . import pku
@@ -15,6 +16,7 @@ from . import zju
 
 def get_rules() -> List[Rule]:
     return [
+        *casia.get_rules(),
         *fdu.get_rules(),
         *nju.get_rules(),
         *pku.get_rules(),
