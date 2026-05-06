@@ -121,6 +121,25 @@ header .meta {{
 .risks li {{
   color: var(--danger);
 }}
+.card.sent {{
+  opacity: 0.6;
+}}
+.card.sent .card-header h2 {{
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}}
+.sent-toggle {{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}}
+.sent-toggle input {{
+  cursor: pointer;
+}}
 .empty {{
   text-align: center;
   color: var(--text-secondary);
@@ -204,6 +223,33 @@ header .meta {{
   if (searchInput) searchInput.addEventListener('input', update);
   if (sortSelect) sortSelect.addEventListener('change', update);
   update();
+
+  // Sent-status persistence
+  (function() {{
+    const storageKey = 'sent_emails_' + document.title.replace(/[^a-zA-Z0-9\\u4e00-\\u9fa5]/g, '_');
+    let sentMap = {{}};
+    try {{
+      sentMap = JSON.parse(localStorage.getItem(storageKey) || '{{}}');
+    }} catch(e) {{}}
+    document.querySelectorAll('.sent-toggle input').forEach(function(cb) {{
+      const teacher = cb.dataset.teacher;
+      if (sentMap[teacher]) {{
+        cb.checked = true;
+        cb.closest('.card').classList.add('sent');
+      }}
+      cb.addEventListener('change', function() {{
+        const card = this.closest('.card');
+        if (this.checked) {{
+          card.classList.add('sent');
+          sentMap[teacher] = true;
+        }} else {{
+          card.classList.remove('sent');
+          delete sentMap[teacher];
+        }}
+        localStorage.setItem(storageKey, JSON.stringify(sentMap));
+      }});
+    }});
+  }})();
 }})();
 </script>
 </body>
@@ -246,11 +292,18 @@ def json_to_html(data: dict, title: str) -> str:
         reasons_html = "\n".join(f"<li>{r}</li>" for r in reasons)
         risks_html = "\n".join(f"<li>{r}</li>" for r in risks) if risks else "<li>暂无明确风险提示</li>"
 
+        safe_teacher = teacher.replace('"', '&quot;')
         cards_html += f"""
 <div class="card" data-score="{score}" data-name="{teacher}">
   <div class="card-header">
     <h2>{teacher}</h2>
-    <span class="score">匹配分 {score}</span>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="score">匹配分 {score}</span>
+      <label class="sent-toggle">
+        <input type="checkbox" data-teacher="{safe_teacher}">
+        <span>已发送</span>
+      </label>
+    </div>
   </div>
   <div class="section-title">匹配理由</div>
   <ul class="reasons">

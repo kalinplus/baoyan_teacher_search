@@ -815,8 +815,129 @@ def _scrape_nju_profile(html: str, url: str) -> Dict[str, object]:
 
 
 # ---------------------------------------------------------------------------
+# ICT structured profile scrape
+# ---------------------------------------------------------------------------
+
+ICT_PROFILE_URL_PATTERN = re.compile(r"https?://ict\.cas\.cn/sourcedb/cn/jssrck/")
+
+
+def _extract_ict_section(html: str, heading_text: str) -> str:
+    """Extract text content from a tem01-people-content section by heading."""
+    # Normalize &nbsp; entities so regex \s can match them
+    norm_html = html.replace("&nbsp;", " ")
+    pat = re.compile(
+        rf'<h3[^>]*>\s*<span[^>]*>\s*{heading_text}[:：]*\s*</span>\s*</h3>\s*'
+        rf'<div[^>]*>\s*<div[^>]*class="trs_editor_view[^"]*"[^>]*>(.*?)</div>\s*</div>',
+        re.IGNORECASE | re.DOTALL,
+    )
+    m = pat.search(norm_html)
+    if not m:
+        return ""
+    content = re.sub(r"<[^>]+>", " ", m.group(1))
+    content = re.sub(r"\s+", " ", content).strip()
+    return content
+
+
+def _scrape_ict_profile(html: str, url: str) -> Dict[str, object]:
+    email: Optional[str] = None
+    title: Optional[str] = None
+    department: Optional[str] = None
+    advisor_type: Optional[str] = None
+    personal_homepage: Optional[str] = None
+
+    for p_match in re.finditer(r'<p\s+class="p-people-content"[^>]*>(.*?)</p>', html, re.IGNORECASE | re.DOTALL):
+        p_html = p_match.group(1)
+        p_text = re.sub(r"<[^>]+>", "", p_html).strip()
+        if p_text.startswith("联系方式："):
+            email_match = EMAIL_STANDARD.search(p_text)
+            if email_match:
+                email = email_match.group(0).lower()
+        elif p_text.startswith("所属部门："):
+            department = p_text.replace("所属部门：", "").strip()
+        elif p_text.startswith("导师类别："):
+            advisor_type = p_text.replace("导师类别：", "").strip()
+            title_match = TITLE_PATTERN.search(advisor_type)
+            if title_match:
+                title = title_match.group(0)
+        elif p_text.startswith("个人网页："):
+            href_match = re.search(r'href=["\']([^"\']+)["\']', p_html)
+            if href_match:
+                personal_homepage = href_match.group(1).strip()
+
+    if not title:
+        title_match = TITLE_PATTERN.search(html)
+        if title_match:
+            title = title_match.group(0)
+
+    bio = _extract_ict_section(html, r"简\s*历")
+    works = _extract_ict_section(html, r"主要论著")
+    projects = _extract_ict_section(html, r"科研项目")
+    awards = _extract_ict_section(html, r"获奖及荣誉")
+
+    lines: list[str] = []
+    if department:
+        lines.append(f"所属部门：{department}")
+    if advisor_type:
+        lines.append(f"导师类别：{advisor_type}")
+    if email:
+        lines.append(f"邮箱：{email}")
+    if personal_homepage:
+        lines.append(f"个人主页：{personal_homepage}")
+
+    research_fields: list[str] = []
+    if bio:
+        lines.append("")
+        lines.append("简历：")
+        lines.append(bio)
+        for pat in [
+            re.compile(r"主要研究方向[是为:]\s*([^。\n]+)"),
+            re.compile(r"研究方向[是为:]\s*([^。\n]+)"),
+            re.compile(r"研究领域[是为:]\s*([^。\n]+)"),
+        ]:
+            m = pat.search(bio)
+            if m:
+                raw = m.group(1).strip()
+                parts = re.split(r"[、,，;；/|]+", raw)
+                for part in parts:
+                    part = part.strip()
+                    if 2 <= len(part) <= 40:
+                        research_fields.append(part)
+                if research_fields:
+                    break
+
+    if works:
+        lines.append("")
+        lines.append("主要论著：")
+        lines.append(works)
+    if projects:
+        lines.append("")
+        lines.append("科研项目：")
+        lines.append(projects)
+    if awards:
+        lines.append("")
+        lines.append("获奖及荣誉：")
+        lines.append(awards)
+
+    full_text = "\n".join(lines)
+    conferences = list(dict.fromkeys(CONFERENCE_PATTERN.findall(full_text)))
+
+    return {
+        "full_text": full_text,
+        "research_fields": research_fields if research_fields else None,
+        "bio": bio[:800] if bio else None,
+        "email": email,
+        "title": title,
+        "representative_works": works if works else None,
+        "personal_homepage": personal_homepage,
+        "recruiting_status": extract_recruiting_status(full_text),
+        "conferences": conferences if conferences else None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Single profile scrape
 # ---------------------------------------------------------------------------
+
 
 def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
     html = fetch_html(url, timeout=timeout)
@@ -829,6 +950,9 @@ def scrape_profile(url: str, timeout: int = 30) -> Dict[str, object]:
 
     if NJU_PROFILE_URL_PATTERN.match(url):
         return _scrape_nju_profile(html, url)
+
+    if ICT_PROFILE_URL_PATTERN.search(url):
+        return _scrape_ict_profile(html, url)
 
     text = clean_text(html_to_text(html))
     return _scrape_generic_profile(text)

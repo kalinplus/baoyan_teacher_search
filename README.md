@@ -93,6 +93,7 @@ pip install -r requirements.txt
 - 中国人民大学 高瓴人工智能学院：`.tutor.media` 卡片内 `<h2><a>` 提取 `name/profile_url/title`
 - 南京大学 智能科学与技术学院：Sudy CMS `/_wp3services/generalQuery?queryObj=teacherHome` 接口提取 `name/profile_url/title/interests`
 - 中国科学院自动化研究所 研究生导师：表格内 `people.ucas.(ac|edu).cn` 链接提取 `name/profile_url`
+- 中国科学院计算技术研究所 博士生导师 / 硕士生导师：`sourcedb/cn/jssrck` 个人主页链接提取 `name/profile_url`
 
 关键词白名单配置：
 
@@ -118,6 +119,7 @@ pip install -r requirements.txt
 - 中国人民大学 高瓴人工智能学院：26
 - 南京大学 智能科学与技术学院：52
 - 中国科学院自动化研究所 研究生导师：222
+- 中国科学院计算技术研究所 研究生导师（博导+硕导，去重）：213
 
 执行示例：
 
