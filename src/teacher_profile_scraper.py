@@ -1029,6 +1029,35 @@ def scrape_profiles(
             stats["scraped"] += 1
             logger.info("Scraped %s: research=%s, email=%s", name, result.get("research_fields"), result.get("email"))
 
+    # Synthesize homepage for teachers without scraped profiles so LLM pipeline can still process them
+    for p in profiles:
+        if p.get("homepage") is None:
+            lines: list[str] = []
+            name = p.get("name", "")
+            title = p.get("title")
+            email = p.get("email")
+            interests = p.get("interests", [])
+            profile_url = p.get("profile_url")
+            if name:
+                lines.append(f"姓名：{name}")
+            if title:
+                lines.append(f"职称：{title}")
+            if email:
+                lines.append(f"邮箱：{email}")
+            if interests:
+                lines.append(f"研究领域：{'、'.join(interests)}")
+            p["homepage"] = {
+                "full_text": "\n".join(lines),
+                "research_fields": interests if interests else None,
+                "bio": "",
+                "email": email,
+                "title": title,
+                "representative_works": None,
+                "personal_homepage": profile_url,
+                "recruiting_status": "unknown",
+                "conferences": None,
+            }
+
     data["teacher_profiles"] = profiles
     Path(output_path).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("Saved %s: scraped=%d, skipped=%d, failed=%d", output_path, stats["scraped"], stats["skipped"], stats["failed"])

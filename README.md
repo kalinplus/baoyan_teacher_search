@@ -92,6 +92,7 @@ pip install -r requirements.txt
 - 上海创智学院 学院导师：AJAX POST `/_wp3services/generalQuery` API 获取教师 JSON，提取 `name/profile_url/title/interests`
 - 中国人民大学 高瓴人工智能学院：`.tutor.media` 卡片内 `<h2><a>` 提取 `name/profile_url/title`
 - 南京大学 智能科学与技术学院：Sudy CMS `/_wp3services/generalQuery?queryObj=teacherHome` 接口提取 `name/profile_url/title/interests`
+- 北京大学 软件工程国家工程研究中心：`<table class="fedd">` 结构化提取 `name/title/email/interests`，少数含 `Webpage` 链接
 - 中国科学院自动化研究所 研究生导师：表格内 `people.ucas.(ac|edu).cn` 链接提取 `name/profile_url`
 - 中国科学院计算技术研究所 博士生导师 / 硕士生导师：`sourcedb/cn/jssrck` 个人主页链接提取 `name/profile_url`
 
@@ -116,6 +117,7 @@ pip install -r requirements.txt
 - 浙江大学 计算机科学与技术学院：~73
 - 浙江大学 软件学院：~98
 - 上海创智学院 学院导师：73
+- 北京大学 软件工程国家工程研究中心：17（列表页直接提取，大多数教师无独立主页）
 - 中国人民大学 高瓴人工智能学院：26
 - 南京大学 智能科学与技术学院：52
 - 中国科学院自动化研究所 研究生导师：222

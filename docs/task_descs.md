@@ -53,9 +53,11 @@
 - [ ] 中国科学院软件研究所（软件所）教师页适配
 - [x] 中国人民大学高瓴人工智能学院（人大高瓴）教师页适配
 - [x] 南京大学计算机相关学院教师页适配（计算机科学与技术系、人工智能学院、软件学院等）
+- [x] 北京大学软件工程国家工程研究中心教师页适配
 
 ## 历史执行记录
 
+- 2026-05-07：新增北京大学软件工程国家工程研究中心教师页适配，`<table class="fedd">` 结构化提取 17 位教师（列表页含 title/email/interests，仅 6 位有 Webpage 链接），因大多数教师无独立主页，teacher_profile_scraper 增加 synthetic homepage 兜底逻辑，LLM Pipeline 提取 17/17，匹配 16/17。
 - 2026-05-06：新增中国科学院计算技术研究所（计算所）博士生导师 + 硕士生导师页适配，通过 `sourcedb/cn/jssrck` 个人主页链接提取 213 位导师（博导 103 + 硕导 110，去重），profile scraper 结构化解析 `p-people-content` + `tem01-people-content` 分节提取，成功率 ~90%，LLM Pipeline 匹配 28/213。
 - 2026-05-05：新增中国科学院自动化研究所（自动化所）研究生导师页适配，通过表格内 `people.ucas.(ac|edu).cn` 链接提取 222 位导师，profile scraper 成功率 99.1%，LLM Pipeline 匹配 219/222。
 - 2026-04-25：新增复旦大学计算与智能创新学院教师页适配，通过 `_wp3services/generalQuery?queryObj=teacherHome` API 全量采集 287 位教职工。

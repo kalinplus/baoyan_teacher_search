@@ -171,6 +171,86 @@ def supports_pku_ai(url: str) -> bool:
     return url.startswith("https://www.ai.pku.edu.cn/sztd/zzjyry1.htm")
 
 
+def extract_pku_se_names(html: str) -> List[str]:
+    profiles = extract_pku_se_profiles(html, "")
+    return [p.name for p in profiles]
+
+
+def extract_pku_se_profiles(html: str, source_url: str) -> List[TeacherProfile]:
+    profiles: List[TeacherProfile] = []
+    blocks = re.split(r'<table class="fedd"[^>]*>', html, flags=re.IGNORECASE)[1:]
+
+    for block in blocks:
+        table_end = block.find('</table>')
+        if table_end != -1:
+            block = block[:table_end]
+
+        name_match = re.search(r'<strong[^>]*>([^<]+)</strong>', block, flags=re.IGNORECASE)
+        if not name_match:
+            continue
+
+        name = normalize_text(unescape(name_match.group(1)))
+        if not is_chinese_name(name):
+            continue
+
+        # title is usually the first <td align="left"> after the name row
+        title = None
+        title_match = re.search(r'<td[^>]*align=["\']left["\'][^>]*>([^<]+)</td>', block, flags=re.IGNORECASE)
+        if title_match:
+            raw_title = normalize_text(unescape(title_match.group(1)))
+            # skip degree lines like "2004年获得理学博士学位（北京大学）"
+            if raw_title and not re.match(r"^\d{4}年", raw_title) and "获得" not in raw_title:
+                title = raw_title
+
+        # filter out contact-info mistakenly captured as title
+        if title and any(k in title for k in ("E-mail", "办公地址", "联系电话", "Webpage")):
+            title = None
+
+        email_match = re.search(r'E-\s*mail\s*[：:]\s*([^\s<]+)', block, flags=re.IGNORECASE)
+        email = email_match.group(1).strip() if email_match else None
+
+        interests: List[str] = []
+        interests_match = re.search(r'主要研究领域\s*[：:]\s*</strong>\s*([^<\n]+)', block, flags=re.IGNORECASE)
+        if interests_match:
+            raw = normalize_text(unescape(interests_match.group(1)))
+            interests = [part.strip() for part in re.split(r"[、,，;；/|]+", raw) if part.strip()]
+
+        profile_url = None
+        webpage_match = re.search(r'Webpage\s*[：:]\s*(http[s]?://[^\s<]+)', block, flags=re.IGNORECASE)
+        if webpage_match:
+            profile_url = webpage_match.group(1).strip()
+
+        profiles.append(
+            TeacherProfile(
+                name=name,
+                profile_url=profile_url,
+                email=email,
+                interests=interests,
+                title=title,
+                source_url=source_url,
+            )
+        )
+
+    # Deduplicate by name, preferring the richer record (more fields filled)
+    seen: dict[str, TeacherProfile] = {}
+    for p in profiles:
+        if p.name not in seen:
+            seen[p.name] = p
+        else:
+            existing = seen[p.name]
+            # richer = more non-null fields among email, interests, title
+            existing_score = sum(bool(v) for v in [existing.email, existing.interests, existing.title])
+            new_score = sum(bool(v) for v in [p.email, p.interests, p.title])
+            if new_score > existing_score:
+                seen[p.name] = p
+
+    return list(seen.values())
+
+
+def supports_pku_se(url: str) -> bool:
+    return "se.pku.edu.cn/ky/kyry/index.htm" in url
+
+
 def get_rules() -> List[Rule]:
     return [
         Rule(
@@ -184,5 +264,11 @@ def get_rules() -> List[Rule]:
             matcher=supports_pku_ai,
             extractor=lambda _html: [],
             profile_extractor=extract_pku_ai_profiles,
+        ),
+        Rule(
+            name="pku_se_table",
+            matcher=supports_pku_se,
+            extractor=extract_pku_se_names,
+            profile_extractor=extract_pku_se_profiles,
         ),
     ]

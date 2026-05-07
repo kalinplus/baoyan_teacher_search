@@ -374,7 +374,6 @@ def main():
         output_dir = repo_root / "output"
         input_dirs = sorted({
             p.parent for p in output_dir.rglob("recommendations.json")
-            if any(part in ("recommendations", "teacher_pool") for part in p.relative_to(output_dir).parts)
         })
 
     groups = []
