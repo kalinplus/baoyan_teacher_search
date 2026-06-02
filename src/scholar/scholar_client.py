@@ -32,7 +32,7 @@ class ScholarAuthorClient:
         self.timeout = timeout
         self.endpoint = endpoint
         self.max_attempts = 3
-        self.retry_timeout_step = 120
+        self.retry_timeout_step = 30
 
     def _request_with_retry(self, *, author_id: str) -> requests.Response:
         for attempt in range(1, self.max_attempts + 1):
